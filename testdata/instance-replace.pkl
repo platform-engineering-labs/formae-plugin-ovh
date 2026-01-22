@@ -1,0 +1,60 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+import "@formae/formae.pkl"
+
+import "@ovh/ovh.pkl"
+
+import "@ovh/compute/instance.pkl"
+
+local stackName = "plugin-sdk-test-stack"
+// Read the test run ID from environment variable set by the test harness
+// This ensures consistent naming within a test run but unique names between runs
+local testRunID = read("env:FORMAE_TEST_RUN_ID")
+
+// OVH-provided resource IDs (these are pre-existing in the OVH environment)
+// Ext-Net is the public network provided by OVH for external connectivity
+local extNetID = "b347ed75-8603-4ce0-a40c-c6c98a8820fc"
+// Ubuntu 24.04 image provided by OVH
+local ubuntuImageID = "03302136-e20b-446e-8b27-cf0aaf161810"
+// d2-2 flavor (2GB RAM, 1 vCPU, larger disk) - different from s1-2 to force replacement
+local replacementFlavorID = "c4fbe989-4e2f-487c-b9db-9eb29808b826"
+
+forma {
+  new formae.Stack {
+    label = stackName
+    description = "Plugin SDK test for OVH Instance - Replace"
+  }
+
+  new formae.Target {
+    label = "ovh-target"
+    config = new ovh.Config {
+      authURL = "https://auth.cloud.ovh.us/v3"
+      region = "US-EAST-VA-1"
+      // username, password, projectID, domainName will be read from environment variables:
+      // OS_USERNAME, OS_PASSWORD, OS_PROJECT_ID, OS_USER_DOMAIN_NAME
+    }
+  }
+
+  // Replace the instance - change CreateOnly property (flavor_id)
+  new instance.Instance {
+    label = "plugin-sdk-test-instance"
+    name = "formae-plugin-sdk-test-\(testRunID)-replaced"
+    flavor_id = replacementFlavorID // CreateOnly change forces replacement
+    image_id = ubuntuImageID // No change
+    networks = new Listing {
+      // Public network (Ext-Net) - pre-existing OVH resource
+      new instance.NetworkAttachment {
+        uuid = extNetID
+      }
+    }
+    metadata = new Mapping {
+      ["environment"] = "test-replaced"
+      ["managed_by"] = "formae"
+    }
+  }
+}

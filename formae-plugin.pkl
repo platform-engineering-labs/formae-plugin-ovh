@@ -1,0 +1,19 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/// OVH Cloud plugin manifest for Formae.
+/// This plugin provides resource management for OVH Public Cloud infrastructure
+/// using the OpenStack APIs.
+
+name = "ovh"
+version = "0.1.0"
+namespace = "OVH"
+license = "Apache-2.0"
+minFormaeVersion = "0.76.0"
+
+output {
+  renderer = new JsonRenderer {}
+}

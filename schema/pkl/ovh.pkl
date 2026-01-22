@@ -1,0 +1,52 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module ovh
+
+import "@formae/formae.pkl"
+
+// OVH Cloud regions
+typealias Region = "BHS5" |  // Beauharnois, Canada
+  "DE1" |                     // Frankfurt, Germany
+  "GRA7" |                    // Gravelines, France
+  "GRA9" |                    // Gravelines, France
+  "SBG5" |                    // Strasbourg, France
+  "UK1" |                     // London, UK
+  "WAW1" |                    // Warsaw, Poland
+  "US-EAST-VA-1"              // Virginia, USA
+
+/// OVH target configuration
+/// Credentials (username, password, projectID, domainName) are read from
+/// environment variables at runtime and are never stored in the target config.
+/// Required environment variables:
+///   - OS_USERNAME
+///   - OS_PASSWORD
+///   - OS_PROJECT_ID
+///   - OS_USER_DOMAIN_NAME (optional, defaults to "Default")
+open class Config {
+  hidden fixed type: String = "OVH"
+
+  /// OpenStack Keystone v3 authentication URL (e.g., https://auth.cloud.ovh.us/v3)
+  hidden authURL: String
+
+  /// OVH Cloud region
+  hidden region: Region
+
+  // Only non-sensitive fields are exported to the target config
+  fixed Type: String = type
+  fixed AuthURL: String = authURL
+  fixed Region: Region = region
+}
+
+class FieldHint extends formae.FieldHint {}
+
+class ResourceHint extends formae.ResourceHint {
+  hidden outputKeyTransformation: (String) -> String = (it) -> it
+}
+
+class SubResourceHint extends formae.SubResourceHint {
+  hidden outputKeyTransformation: (String) -> String = (it) -> it
+}

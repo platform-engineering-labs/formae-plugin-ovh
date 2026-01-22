@@ -1,0 +1,66 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module router
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Network::Router"
+
+@ovh.SubResourceHint
+open class GatewayInfo extends formae.SubResource {
+  network_id: String|formae.Resolvable
+  enable_snat: Boolean?
+}
+
+/// Static route for a router
+@ovh.SubResourceHint
+open class Route extends formae.SubResource {
+  /// Destination CIDR (e.g., "10.0.0.0/24")
+  destination: String
+
+  /// Next hop IP address
+  nexthop: String
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class Router extends formae.Resource {
+  @ovh.FieldHint {
+    required = false
+  }
+  name: String?
+
+  @ovh.FieldHint {
+    required = false
+  }
+  description: String?
+
+  @ovh.FieldHint {
+    required = false
+  }
+  admin_state_up: Boolean?
+
+  @ovh.FieldHint {
+    required = false
+  }
+  external_gateway_info: GatewayInfo?
+
+  @ovh.FieldHint {
+    required = false
+  }
+  routes: Listing<Route>?
+
+  @ovh.FieldHint {
+    required = false
+  }
+  tags: Listing<String>?
+
+  // id is computed by OpenStack - not user-provided
+}

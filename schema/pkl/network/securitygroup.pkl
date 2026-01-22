@@ -1,0 +1,36 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module securitygroup
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Network::SecurityGroup"
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class SecurityGroup extends formae.Resource {
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  name: String
+
+  @ovh.FieldHint {
+    required = false
+  }
+  description: String?
+
+  @ovh.FieldHint {
+    required = false
+  }
+  tags: Listing<String>?
+
+  // id is computed by OpenStack - not user-provided
+}

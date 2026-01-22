@@ -1,0 +1,70 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module instance
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Compute::Instance"
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class Instance extends formae.Resource {
+  @ovh.FieldHint {
+    required = true
+  }
+  name: String
+
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  flavor_id: String
+
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  image_id: String
+
+  @ovh.FieldHint {
+    createOnly = true
+  }
+  networks: Listing<NetworkAttachment>?
+
+  security_groups: Listing<String>?
+
+  @ovh.FieldHint {
+    createOnly = true
+  }
+  key_name: String?
+
+  @ovh.FieldHint {
+    createOnly = true
+  }
+  user_data: String?
+
+  @ovh.FieldHint {
+    createOnly = true
+  }
+  availability_zone: String?
+
+  metadata: Mapping<String, String>?
+
+  // Computed fields (not user-provided)
+  // id: String
+  // status: String
+}
+
+@ovh.SubResourceHint
+open class NetworkAttachment extends formae.SubResource {
+  uuid: (String|formae.Resolvable)?
+  port: (String|formae.Resolvable)?
+  fixed_ip: String?
+}

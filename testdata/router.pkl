@@ -1,0 +1,45 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+import "@formae/formae.pkl"
+
+import "@ovh/ovh.pkl"
+
+import "@ovh/network/router.pkl"
+
+local stackName = "plugin-sdk-test-stack"
+// Read the test run ID from environment variable set by the test harness
+// This ensures consistent naming within a test run but unique names between runs
+local testRunID = read("env:FORMAE_TEST_RUN_ID")
+
+forma {
+  new formae.Stack {
+    label = stackName
+    description = "Plugin SDK test for OVH Router"
+  }
+
+  new formae.Target {
+    label = "ovh-target"
+    config = new ovh.Config {
+      authURL = "https://auth.cloud.ovh.us/v3"
+      region = "US-EAST-VA-1"
+      // username, password, projectID, domainName will be read from environment variables:
+      // OS_USERNAME, OS_PASSWORD, OS_PROJECT_ID, OS_USER_DOMAIN_NAME
+    }
+  }
+
+  new router.Router {
+    label = "plugin-sdk-test-router"
+    name = "formae-plugin-sdk-test-router-\(testRunID)"
+    description = "Test router for plugin SDK tests"
+    admin_state_up = true
+    tags {
+      "env:test"
+      "managed-by:formae"
+    }
+  }
+}

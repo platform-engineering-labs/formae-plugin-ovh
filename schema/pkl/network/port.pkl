@@ -1,0 +1,115 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module port
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Network::Port"
+
+/// Resolvable reference to a Port resource
+/// Use this to reference a port's properties in dependent resources
+open class PortResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  /// The port's unique identifier
+  hidden id: PortResolvable = (this) {
+    property = "id"
+  }
+
+  /// The port's network ID
+  hidden network_id: PortResolvable = (this) {
+    property = "network_id"
+  }
+
+  /// The port's MAC address
+  hidden mac_address: PortResolvable = (this) {
+    property = "mac_address"
+  }
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class Port extends formae.Resource {
+  @ovh.FieldHint {
+    required = false
+  }
+  name: String?
+
+  @ovh.FieldHint {
+    required = false
+    createOnly = true  // OVH does not support updating description on ports
+  }
+  description: String?
+
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  network_id: String|formae.Resolvable
+
+  @ovh.FieldHint {
+    required = false
+    createOnly = true
+  }
+  fixed_ips: Listing<FixedIP>?
+
+  @ovh.FieldHint {
+    required = false
+  }
+  security_groups: Listing<String>?
+
+  @ovh.FieldHint {
+    required = false
+  }
+  admin_state_up: Boolean?
+
+  @ovh.FieldHint {
+    required = false
+    createOnly = true
+  }
+  mac_address: String?
+
+  @ovh.FieldHint {
+    required = false
+  }
+  allowed_address_pairs: Listing<AddressPair>?
+
+  @ovh.FieldHint {
+    required = false
+  }
+  tags: Listing<String>?
+
+  // id is computed by OpenStack - not user-provided
+
+  local parent = this
+
+  /// Provides resolvable references to this port's properties
+  hidden res: PortResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}
+
+@ovh.SubResourceHint
+open class FixedIP extends formae.SubResource {
+  subnet_id: String|formae.Resolvable
+  ip_address: String?
+}
+
+/// Allowed address pair for HA configurations
+/// Allows traffic from additional IP/MAC addresses through the port
+@ovh.SubResourceHint
+open class AddressPair extends formae.SubResource {
+  /// IP address or CIDR to allow
+  ip_address: String
+
+  /// Optional MAC address (defaults to port's MAC address)
+  mac_address: String?
+}

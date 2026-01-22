@@ -1,0 +1,99 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module subnet
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Network::Subnet"
+
+/// Resolvable reference to a Subnet resource
+/// Use this to reference a subnet's properties in dependent resources
+open class SubnetResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  /// The subnet's unique identifier
+  hidden id: SubnetResolvable = (this) {
+    property = "id"
+  }
+
+  /// The subnet's network ID
+  hidden network_id: SubnetResolvable = (this) {
+    property = "network_id"
+  }
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class Subnet extends formae.Resource {
+  @ovh.FieldHint {
+    required = false
+  }
+  name: String?
+
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  network_id: String|formae.Resolvable
+
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  cidr: String
+
+  @ovh.FieldHint {
+    required = false
+    createOnly = true
+  }
+  ip_version: Int?
+
+  @ovh.FieldHint {
+    required = false
+  }
+  gateway_ip: String?
+
+  @ovh.FieldHint {
+    required = false
+  }
+  enable_dhcp: Boolean?
+
+  @ovh.FieldHint {
+    required = false
+  }
+  dns_nameservers: Listing<String>?
+
+  @ovh.FieldHint {
+    required = false
+    createOnly = true
+  }
+  allocation_pools: Listing<AllocationPool>?
+
+  @ovh.FieldHint {
+    required = false
+  }
+  tags: Listing<String>?
+
+  // id is computed by OpenStack - not user-provided
+
+  local parent = this
+
+  /// Provides resolvable references to this subnet's properties
+  hidden res: SubnetResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}
+
+@ovh.SubResourceHint
+open class AllocationPool extends formae.SubResource {
+  start: String
+  end: String
+}

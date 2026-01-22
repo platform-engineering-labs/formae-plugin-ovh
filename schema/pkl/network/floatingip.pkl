@@ -1,0 +1,71 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module floatingip
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Network::FloatingIP"
+
+/// Resolvable reference to a FloatingIP resource
+/// Use this to reference a floating IP's properties in dependent resources
+open class FloatingIPResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  /// The floating IP's unique identifier
+  hidden id: FloatingIPResolvable = (this) {
+    property = "id"
+  }
+
+  /// The floating IP address
+  hidden floating_ip_address: FloatingIPResolvable = (this) {
+    property = "floating_ip_address"
+  }
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class FloatingIP extends formae.Resource {
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  floating_network_id: String|formae.Resolvable
+
+  @ovh.FieldHint {
+    required = false
+    createOnly = true
+  }
+  floating_ip_address: String?
+
+  @ovh.FieldHint {
+    required = false
+  }
+  port_id: (String|formae.Resolvable)?
+
+  @ovh.FieldHint {
+    required = false
+  }
+  fixed_ip_address: String?
+
+  @ovh.FieldHint {
+    required = false
+  }
+  description: String?
+
+  // id, status, router_id are computed by OpenStack - not user-provided
+
+  local parent = this
+
+  /// Provides resolvable references to this floating IP's properties
+  hidden res: FloatingIPResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}

@@ -1,0 +1,61 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+import "@formae/formae.pkl"
+
+import "@ovh/ovh.pkl"
+
+import "@ovh/compute/instance.pkl"
+
+local stackName = "plugin-sdk-test-stack"
+// Read the test run ID from environment variable set by the test harness
+// This ensures consistent naming within a test run but unique names between runs
+local testRunID = read("env:FORMAE_TEST_RUN_ID")
+
+// OVH-provided resource IDs (these are pre-existing in the OVH environment)
+// Ext-Net is the public network provided by OVH for external connectivity
+local extNetID = "b347ed75-8603-4ce0-a40c-c6c98a8820fc"
+// Ubuntu 24.04 image provided by OVH
+local ubuntuImageID = "03302136-e20b-446e-8b27-cf0aaf161810"
+// s1-2 flavor (2GB RAM, 1 vCPU)
+local flavorID = "a64381e7-c4e7-4b01-9fbe-da405c544d2e"
+
+forma {
+  new formae.Stack {
+    label = stackName
+    description = "Plugin SDK test for OVH Instance - Update"
+  }
+
+  new formae.Target {
+    label = "ovh-target"
+    config = new ovh.Config {
+      authURL = "https://auth.cloud.ovh.us/v3"
+      region = "US-EAST-VA-1"
+      // username, password, projectID, domainName will be read from environment variables:
+      // OS_USERNAME, OS_PASSWORD, OS_PROJECT_ID, OS_USER_DOMAIN_NAME
+    }
+  }
+
+  // Update the instance - change mutable properties (name and metadata)
+  new instance.Instance {
+    label = "plugin-sdk-test-instance"
+    name = "formae-plugin-sdk-test-\(testRunID)-updated" // Mutable: name change
+    flavor_id = flavorID // CreateOnly, no change
+    image_id = ubuntuImageID // CreateOnly, no change
+    networks = new Listing {
+      // Public network (Ext-Net) - pre-existing OVH resource
+      new instance.NetworkAttachment {
+        uuid = extNetID
+      }
+    }
+    metadata = new Mapping { // Mutable: metadata change
+      ["environment"] = "test-updated"
+      ["managed_by"] = "formae"
+      ["updated"] = "true"
+    }
+  }
+}
