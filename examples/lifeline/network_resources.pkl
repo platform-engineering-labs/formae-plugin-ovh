@@ -1,0 +1,66 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+import "@formae/formae.pkl"
+import "@ovh/network/network.pkl"
+import "@ovh/network/subnet.pkl"
+import "@ovh/network/router.pkl"
+import "@ovh/network/floatingip.pkl"
+
+class NetworkResources {
+    name: String
+    networkCidr: String
+    subnetCidr: String
+    extNetID: String
+
+    /// Private network for the project (equivalent to AWS VPC)
+    hidden network: network.Network = new {
+        label = "lifeline-network"
+        name = name + "-network"
+        description = "Private network for lifeline project"
+        admin_state_up = true
+    }
+
+    /// Subnet within the private network
+    hidden subnet: subnet.Subnet = new {
+        label = "lifeline-subnet"
+        name = name + "-subnet"
+        description = "Main subnet for lifeline project"
+        network_id = network.res.id
+        cidr = subnetCidr
+        ip_version = 4
+        enable_dhcp = true
+        dns_nameservers = new Listing {
+            "8.8.8.8"
+            "8.8.4.4"
+        }
+    }
+
+    /// Router with external gateway (equivalent to AWS IGW + route table)
+    hidden router: router.Router = new {
+        label = "lifeline-router"
+        name = name + "-router"
+        description = "Router for external connectivity"
+        admin_state_up = true
+        external_gateway_info = new router.GatewayInfo {
+            network_id = extNetID
+        }
+    }
+
+    /// Floating IP for external access (equivalent to AWS EIP)
+    hidden floatingIP: floatingip.FloatingIP = new {
+        label = "lifeline-floatingip"
+        floating_network_id = extNetID
+        description = "Floating IP for lifeline project"
+    }
+
+    hidden resources: Listing<formae.Resource> = new {
+        network
+        subnet
+        router
+        floatingIP
+    }
+}

@@ -1,0 +1,30 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+import "@formae/formae.pkl"
+import "@ovh/ovh.pkl"
+
+projectName = "lifeline"
+stackName = "lifeline"
+region = "US-EAST-VA-1"
+
+// OVH-provided pre-existing resources
+// Ext-Net is the public network provided by OVH for external connectivity
+extNetID = "b347ed75-8603-4ce0-a40c-c6c98a8820fc"
+
+stack: formae.Stack = new {
+    label = stackName
+    description = "OVH Lifeline showcase - demonstrating Day 0 to Day N infrastructure"
+}
+
+target: formae.Target = new formae.Target {
+    label = "ovh-target"
+    config = new ovh.Config {
+        authURL = "https://auth.cloud.ovh.us/v3"
+        region = module.region
+        // Credentials from environment: OS_USERNAME, OS_PASSWORD, OS_PROJECT_ID, OS_USER_DOMAIN_NAME
+    }
+}

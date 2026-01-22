@@ -1,0 +1,77 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+import "@formae/formae.pkl"
+import "@formae/ext/random.pkl"
+
+import "./vars.pkl"
+
+import "./network_resources.pkl" as nw
+import "./security_group_resources.pkl" as sg
+
+description {
+    text = """
+        OVH Lifeline - Demonstrates Day 0 to Day N infrastructure management with Formae.
+
+        This forma creates the foundational infrastructure on OVH Public Cloud:
+        - Private network (equivalent to AWS VPC)
+        - Subnet with DHCP
+        - Router with external gateway (equivalent to AWS IGW + route table)
+        - Floating IP for external access (equivalent to AWS EIP)
+        - Security groups for web and SSH access
+
+        Apply this forma initially to create the basic infrastructure.
+        Make changes and reapply to update resources holistically.
+        Use the destroy command to remove all resources.
+
+        Equivalent AWS resources:
+        - Network → VPC
+        - Subnet → Subnet
+        - Router → Internet Gateway + Route Table
+        - FloatingIP → Elastic IP
+        - SecurityGroup → Security Group
+        """
+    confirm = true
+}
+
+local randomId = random.id(4).toString()
+
+properties {
+    name = new formae.Prop {
+        flag = "name"
+        default = "\(vars.projectName)-\(randomId)"
+    }
+
+    networkCidr = new formae.Prop {
+        flag = "networkCidr"
+        default = "10.0.0.0/16"
+    }
+
+    subnetCidr = new formae.Prop {
+        flag = "subnetCidr"
+        default = "10.0.1.0/24"
+    }
+}
+
+local network = new nw.NetworkResources {
+    name = properties.name.value
+    networkCidr = properties.networkCidr.value
+    subnetCidr = properties.subnetCidr.value
+    extNetID = vars.extNetID
+}
+
+local securityGroups = new sg.SecurityGroupResources {
+    name = properties.name.value
+}
+
+forma {
+    vars.stack
+    vars.target
+
+    ...network.resources
+    ...securityGroups.resources
+}

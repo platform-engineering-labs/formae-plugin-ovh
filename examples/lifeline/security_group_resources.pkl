@@ -1,0 +1,74 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+import "@formae/formae.pkl"
+import "@ovh/network/securitygroup.pkl"
+import "@ovh/network/securitygrouprule.pkl"
+
+class SecurityGroupResources {
+    name: String
+
+    /// Security group for web servers (HTTP/HTTPS access)
+    hidden webSg: securitygroup.SecurityGroup = new {
+        label = "lifeline-web-sg"
+        name = name + "-web-sg"
+        description = "Allow HTTP and HTTPS traffic to web servers"
+    }
+
+    /// Allow HTTP from anywhere
+    hidden webHttpIngress: securitygrouprule.SecurityGroupRule = new {
+        label = "lifeline-web-http-ingress"
+        security_group_id = webSg.res.id
+        direction = "ingress"
+        ethertype = "IPv4"
+        protocol = "tcp"
+        port_range_min = 80
+        port_range_max = 80
+        remote_ip_prefix = "0.0.0.0/0"
+        description = "Allow HTTP from anywhere"
+    }
+
+    /// Allow HTTPS from anywhere
+    hidden webHttpsIngress: securitygrouprule.SecurityGroupRule = new {
+        label = "lifeline-web-https-ingress"
+        security_group_id = webSg.res.id
+        direction = "ingress"
+        ethertype = "IPv4"
+        protocol = "tcp"
+        port_range_min = 443
+        port_range_max = 443
+        remote_ip_prefix = "0.0.0.0/0"
+        description = "Allow HTTPS from anywhere"
+    }
+
+    /// Security group for SSH access (bastion/management)
+    hidden sshSg: securitygroup.SecurityGroup = new {
+        label = "lifeline-ssh-sg"
+        name = name + "-ssh-sg"
+        description = "Allow SSH access for management"
+    }
+
+    /// Allow SSH from anywhere (in production, restrict to specific IPs)
+    hidden sshIngress: securitygrouprule.SecurityGroupRule = new {
+        label = "lifeline-ssh-ingress"
+        security_group_id = sshSg.res.id
+        direction = "ingress"
+        ethertype = "IPv4"
+        protocol = "tcp"
+        port_range_min = 22
+        port_range_max = 22
+        remote_ip_prefix = "0.0.0.0/0"
+        description = "Allow SSH from anywhere"
+    }
+
+    hidden resources: Listing<formae.Resource> = new {
+        webSg
+        webHttpIngress
+        webHttpsIngress
+        sshSg
+        sshIngress
+    }
+}
