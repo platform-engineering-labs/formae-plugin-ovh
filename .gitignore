@@ -28,3 +28,7 @@ dist/
 .pkl-cache/
 *.pkl-expected.pcf
 .env.ovh
+
+# Internal docs
+.handoffs/
+.plans/
