@@ -146,4 +146,4 @@ jobs:
       - name: Run conformance tests
         env:
           FORMAE_TEST_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
-        run: make conformance-test VERSION=0.77.3-internal
+        run: make conformance-test VERSION=0.77.4-internal
