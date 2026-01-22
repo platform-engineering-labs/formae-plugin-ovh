@@ -10,7 +10,7 @@
 
 name = "ovh"
 version = "0.1.0"
-namespace = "OVH"
+namespace = "ovh"
 license = "Apache-2.0"
 minFormaeVersion = "0.76.0"
 
