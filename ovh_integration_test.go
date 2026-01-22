@@ -176,7 +176,7 @@ func TestOVHKeypairCreate_Integration(t *testing.T) {
 			Properties: properties,
 		},
 		Target: &model.Target{
-			Namespace: "OVH",
+			Namespace: "ovh",
 			Config:    targetConfig,
 		},
 	}
@@ -237,7 +237,7 @@ func TestOVHKeypairRead_Integration(t *testing.T) {
 		ResourceType: "OVH::Compute::Keypair",
 		NativeID:     keypairName,
 		Target: &model.Target{
-			Namespace: "OVH",
+			Namespace: "ovh",
 			Config:    targetConfig,
 		},
 	}
@@ -295,7 +295,7 @@ func TestOVHKeypairDelete_Integration(t *testing.T) {
 		ResourceType: "OVH::Compute::Keypair",
 		NativeID:     &keypairName,
 		Target: &model.Target{
-			Namespace: "OVH",
+			Namespace: "ovh",
 			Config:    targetConfig,
 		},
 	}
@@ -343,7 +343,7 @@ func TestOVHKeypairDelete_NotFound_Integration(t *testing.T) {
 		ResourceType: "OVH::Compute::Keypair",
 		NativeID:     &keypairName,
 		Target: &model.Target{
-			Namespace: "OVH",
+			Namespace: "ovh",
 			Config:    targetConfig,
 		},
 	}
@@ -406,7 +406,7 @@ func TestOVHKeypairList_Integration(t *testing.T) {
 	req := &resource.ListRequest{
 		ResourceType: "OVH::Compute::Keypair",
 		Target: &model.Target{
-			Namespace: "OVH",
+			Namespace: "ovh",
 			Config:    targetConfig,
 		},
 	}
@@ -489,7 +489,7 @@ func TestOVHSecurityGroup_Create_Integration(t *testing.T) {
 			Properties: properties,
 		},
 		Target: &model.Target{
-			Namespace: "OVH",
+			Namespace: "ovh",
 			Config:    targetConfig,
 		},
 	}
@@ -558,7 +558,7 @@ func TestOVHSecurityGroup_Read_Integration(t *testing.T) {
 		ResourceType: "OVH::Network::SecurityGroup",
 		NativeID:     sg.ID,
 		Target: &model.Target{
-			Namespace: "OVH",
+			Namespace: "ovh",
 			Config:    targetConfig,
 		},
 	}
@@ -632,7 +632,7 @@ func TestOVHSecurityGroup_Update_Integration(t *testing.T) {
 			Properties: updatedProperties,
 		},
 		Target: &model.Target{
-			Namespace: "OVH",
+			Namespace: "ovh",
 			Config:    targetConfig,
 		},
 	}
@@ -691,7 +691,7 @@ func TestOVHSecurityGroup_Delete_Integration(t *testing.T) {
 		ResourceType: "OVH::Network::SecurityGroup",
 		NativeID:     &sg.ID,
 		Target: &model.Target{
-			Namespace: "OVH",
+			Namespace: "ovh",
 			Config:    targetConfig,
 		},
 	}
@@ -740,7 +740,7 @@ func TestOVHSecurityGroup_Delete_NotFound_Integration(t *testing.T) {
 		ResourceType: "OVH::Network::SecurityGroup",
 		NativeID:     &nonExistentID,
 		Target: &model.Target{
-			Namespace: "OVH",
+			Namespace: "ovh",
 			Config:    targetConfig,
 		},
 	}
@@ -793,7 +793,7 @@ func TestOVHSecurityGroup_List_Integration(t *testing.T) {
 	req := &resource.ListRequest{
 		ResourceType: "OVH::Network::SecurityGroup",
 		Target: &model.Target{
-			Namespace: "OVH",
+			Namespace: "ovh",
 			Config:    targetConfig,
 		},
 	}
