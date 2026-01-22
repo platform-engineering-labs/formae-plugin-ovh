@@ -140,6 +140,9 @@ jobs:
       # - name: Run integration tests
       #   run: make test-integration
 
+      - name: Install plugin
+        run: make install
+
       - name: Run conformance tests
         env:
           FORMAE_TEST_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
