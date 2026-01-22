@@ -134,6 +134,9 @@ jobs:
           echo "OS_PROJECT_ID=${{ secrets.OS_PROJECT_ID }}" >> $GITHUB_ENV
           echo "OS_REGION_NAME=${{ secrets.OS_REGION_NAME }}" >> $GITHUB_ENV
 
+      - name: Install OpenStack CLI
+        run: pip install python-openstackclient
+
       # =================================================================
 
       # TODO: Fix integration tests to use new SDK API
