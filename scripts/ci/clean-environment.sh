@@ -102,18 +102,19 @@ else
 fi
 
 # 4. Ports (orphaned ports)
+# Use grep for filtering since --name regex support varies by OpenStack version
 delete_resources "ports" \
-    "openstack port list --name '^${TEST_PREFIX}' -f value -c ID" \
+    "openstack port list -f value -c ID -c Name | grep '${TEST_PREFIX}' | awk '{print \$1}'" \
     "openstack port delete"
 
 # 5. Subnets
 delete_resources "subnets" \
-    "openstack subnet list --name '^${TEST_PREFIX}' -f value -c ID" \
+    "openstack subnet list -f value -c ID -c Name | grep '${TEST_PREFIX}' | awk '{print \$1}'" \
     "openstack subnet delete"
 
 # 6. Networks
 delete_resources "networks" \
-    "openstack network list --name '^${TEST_PREFIX}' -f value -c ID" \
+    "openstack network list -f value -c ID -c Name | grep '${TEST_PREFIX}' | awk '{print \$1}'" \
     "openstack network delete"
 
 # 7. Security groups (can't delete default)
