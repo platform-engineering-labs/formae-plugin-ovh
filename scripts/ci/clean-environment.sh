@@ -56,8 +56,9 @@ delete_resources() {
 # Clean resources in dependency order (most dependent first)
 
 # 1. Instances (depend on networks, security groups, keypairs)
+# Use grep for filtering since --name regex support varies by OpenStack version
 delete_resources "instances" \
-    "openstack server list --name '^${TEST_PREFIX}' -f value -c ID" \
+    "openstack server list -f value -c ID -c Name | grep '${TEST_PREFIX}' | awk '{print \$1}'" \
     "openstack server delete --wait"
 
 # 2. Floating IPs (delete all unattached - they don't have names, only IPs)
@@ -76,8 +77,9 @@ else
 fi
 
 # 3. Routers (need to remove interfaces first)
+# Use grep for filtering since --name regex support varies by OpenStack version
 echo "Cleaning routers..."
-router_ids=$(openstack router list --name "^${TEST_PREFIX}" -f value -c ID 2>/dev/null || echo "")
+router_ids=$(openstack router list -f value -c ID -c Name 2>/dev/null | grep "${TEST_PREFIX}" | awk '{print $1}' || echo "")
 if [[ -n "${router_ids}" ]]; then
     while IFS= read -r router_id; do
         if [[ -n "${router_id}" ]]; then
@@ -123,9 +125,11 @@ delete_resources "security groups" \
     "openstack security group delete"
 
 # 8. Volumes
+# Use grep for filtering since --name regex support varies by OpenStack version
+# Note: --force requires admin permissions, so we use regular delete
 delete_resources "volumes" \
-    "openstack volume list --name '^${TEST_PREFIX}' -f value -c ID" \
-    "openstack volume delete --force"
+    "openstack volume list -f value -c ID -c Name | grep '${TEST_PREFIX}' | awk '{print \$1}'" \
+    "openstack volume delete"
 
 # 9. Keypairs
 delete_resources "keypairs" \
