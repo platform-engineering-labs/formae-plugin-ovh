@@ -1,0 +1,57 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+import "@formae/formae.pkl"
+
+import "@ovh/ovh.pkl"
+
+import "@ovh/network/securitygroup.pkl"
+import "@ovh/network/securitygrouprule.pkl"
+
+local stackName = "plugin-sdk-test-stack"
+// Read the test run ID from environment variable set by the test harness
+// This ensures consistent naming within a test run but unique names between runs
+local testRunID = read("env:FORMAE_TEST_RUN_ID")
+
+forma {
+  new formae.Stack {
+    label = stackName
+    description = "Plugin SDK test for OVH SecurityGroupRule"
+  }
+
+  new formae.Target {
+    label = "ovh-target"
+    config = new ovh.Config {
+      authURL = "https://auth.cloud.ovh.us/v3"
+      region = "US-EAST-VA-1"
+      // username, password, projectID, domainName will be read from environment variables:
+      // OS_USERNAME, OS_PASSWORD, OS_PROJECT_ID, OS_USER_DOMAIN_NAME
+    }
+  }
+
+  // Parent security group (dependency)
+  local testSecurityGroup = new securitygroup.SecurityGroup {
+    label = "plugin-sdk-test-sg-for-rule"
+    name = "formae-plugin-sdk-test-sg-for-rule-\(testRunID)"
+    description = "Security group for rule tests"
+  }
+  testSecurityGroup
+
+  // The security group rule under test - changing a createOnly field triggers replacement
+  // This changes port_range_min/max which are createOnly fields
+  new securitygrouprule.SecurityGroupRule {
+    label = "plugin-sdk-test-rule"
+    security_group_id = testSecurityGroup.res.id
+    direction = "ingress"
+    ethertype = "IPv4"
+    protocol = "tcp"
+    port_range_min = 9090  // Changed from 8080 - triggers delete + create
+    port_range_max = 9090  // Changed from 8080 - triggers delete + create
+    remote_ip_prefix = "0.0.0.0/0"
+    description = "Replaced rule with different port (createOnly change)"
+  }
+}
