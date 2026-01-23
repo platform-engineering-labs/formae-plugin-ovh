@@ -4,18 +4,18 @@
 #
 # Clean Environment Hook for OVH/OpenStack
 # =========================================
-# This script cleans up test resources created during conformance tests.
+# This script NUKES all test resources in the OpenStack project.
 # Called before AND after tests to ensure a clean environment.
 #
 # The script is idempotent - safe to run multiple times.
 # Missing resources (already cleaned) do not cause failures.
+#
+# WARNING: This deletes ALL user-created resources in the project!
+# Only the "default" security group (which OpenStack protects) will remain.
 
 set -euo pipefail
 
-# Prefix used for test resources
-TEST_PREFIX="${TEST_PREFIX:-formae-plugin-sdk-test-}"
-
-echo "Cleaning OVH/OpenStack resources with prefix '${TEST_PREFIX}'..."
+echo "=== NUKING OVH/OpenStack environment ==="
 echo ""
 
 # Check if openstack CLI is available
@@ -33,9 +33,9 @@ fi
 
 # Clean resources in dependency order (most dependent first)
 
-# 1. Instances
-echo "Cleaning instances..."
-instance_ids=$(openstack server list -f value -c ID -c Name 2>/dev/null | grep "${TEST_PREFIX}" | awk '{print $1}' || true)
+# 1. Instances (servers)
+echo "Cleaning ALL instances..."
+instance_ids=$(openstack server list -f value -c ID 2>/dev/null || true)
 if [[ -n "${instance_ids}" ]]; then
     echo "${instance_ids}" | while read -r id; do
         [[ -z "${id}" ]] && continue
@@ -43,41 +43,39 @@ if [[ -n "${instance_ids}" ]]; then
         openstack server delete --wait "${id}" 2>/dev/null || echo "  Warning: Failed to delete ${id}"
     done
 else
-    echo "  No instances found with prefix '${TEST_PREFIX}'"
+    echo "  No instances found"
 fi
 
-# 2. Floating IPs - delete ALL unattached
-echo "Cleaning floating IPs (all unattached)..."
-fip_count=0
-while read -r id fip port rest; do
-    [[ -z "${id}" ]] && continue
-    [[ "${id}" == "ID" ]] && continue
-    # If port is "None" or empty, it's unattached
-    if [[ "${port}" == "None" || -z "${port}" ]]; then
-        echo "  Deleting unattached floating IP: ${id} (${fip})"
+# 2. Floating IPs - delete ALL
+echo "Cleaning ALL floating IPs..."
+fip_ids=$(openstack floating ip list -f value -c ID 2>/dev/null || true)
+if [[ -n "${fip_ids}" ]]; then
+    echo "${fip_ids}" | while read -r id; do
+        [[ -z "${id}" ]] && continue
+        echo "  Deleting floating IP: ${id}"
         openstack floating ip delete "${id}" 2>/dev/null || echo "  Warning: Failed to delete ${id}"
-        ((fip_count++)) || true
-    fi
-done < <(openstack floating ip list -f value -c ID -c "Floating IP Address" -c Port 2>/dev/null || true)
-if [[ ${fip_count} -eq 0 ]]; then
-    echo "  No unattached floating IPs found"
+    done
+else
+    echo "  No floating IPs found"
 fi
 
-# 3. Routers (need to remove interfaces first)
-echo "Cleaning routers..."
-router_ids=$(openstack router list -f value -c ID -c Name 2>/dev/null | grep "${TEST_PREFIX}" | awk '{print $1}' || true)
+# 3. Routers (need to remove interfaces and gateway first)
+echo "Cleaning ALL routers..."
+router_ids=$(openstack router list -f value -c ID 2>/dev/null || true)
 if [[ -n "${router_ids}" ]]; then
     echo "${router_ids}" | while read -r router_id; do
         [[ -z "${router_id}" ]] && continue
         echo "  Processing router: ${router_id}"
 
-        # Remove all ports from router
-        port_ids=$(openstack port list --router "${router_id}" -f value -c ID 2>/dev/null || true)
-        echo "${port_ids}" | while read -r port_id; do
-            [[ -z "${port_id}" ]] && continue
-            echo "    Removing port: ${port_id}"
-            openstack router remove port "${router_id}" "${port_id}" 2>/dev/null || true
-        done
+        # Remove all subnet interfaces from router
+        subnet_ids=$(openstack router show "${router_id}" -f json 2>/dev/null | jq -r '.interfaces_info[]?.subnet_id // empty' 2>/dev/null || true)
+        if [[ -n "${subnet_ids}" ]]; then
+            echo "${subnet_ids}" | while read -r subnet_id; do
+                [[ -z "${subnet_id}" ]] && continue
+                echo "    Removing subnet interface: ${subnet_id}"
+                openstack router remove subnet "${router_id}" "${subnet_id}" 2>/dev/null || true
+            done
+        fi
 
         # Clear external gateway
         openstack router unset --external-gateway "${router_id}" 2>/dev/null || true
@@ -86,12 +84,12 @@ if [[ -n "${router_ids}" ]]; then
         openstack router delete "${router_id}" 2>/dev/null || echo "  Warning: Failed to delete ${router_id}"
     done
 else
-    echo "  No routers found with prefix '${TEST_PREFIX}'"
+    echo "  No routers found"
 fi
 
-# 4. Ports
-echo "Cleaning ports..."
-port_ids=$(openstack port list -f value -c ID -c Name 2>/dev/null | grep "${TEST_PREFIX}" | awk '{print $1}' || true)
+# 4. Ports (excluding network:dhcp and network:router_interface which are auto-managed)
+echo "Cleaning ALL user ports..."
+port_ids=$(openstack port list -f value -c ID -c "Device Owner" 2>/dev/null | grep -v "network:" | awk '{print $1}' || true)
 if [[ -n "${port_ids}" ]]; then
     echo "${port_ids}" | while read -r id; do
         [[ -z "${id}" ]] && continue
@@ -99,12 +97,12 @@ if [[ -n "${port_ids}" ]]; then
         openstack port delete "${id}" 2>/dev/null || echo "  Warning: Failed to delete ${id}"
     done
 else
-    echo "  No ports found with prefix '${TEST_PREFIX}'"
+    echo "  No user ports found"
 fi
 
 # 5. Subnets
-echo "Cleaning subnets..."
-subnet_ids=$(openstack subnet list -f value -c ID -c Name 2>/dev/null | grep "${TEST_PREFIX}" | awk '{print $1}' || true)
+echo "Cleaning ALL subnets..."
+subnet_ids=$(openstack subnet list -f value -c ID 2>/dev/null || true)
 if [[ -n "${subnet_ids}" ]]; then
     echo "${subnet_ids}" | while read -r id; do
         [[ -z "${id}" ]] && continue
@@ -112,12 +110,12 @@ if [[ -n "${subnet_ids}" ]]; then
         openstack subnet delete "${id}" 2>/dev/null || echo "  Warning: Failed to delete ${id}"
     done
 else
-    echo "  No subnets found with prefix '${TEST_PREFIX}'"
+    echo "  No subnets found"
 fi
 
-# 6. Networks
-echo "Cleaning networks..."
-network_ids=$(openstack network list -f value -c ID -c Name 2>/dev/null | grep "${TEST_PREFIX}" | awk '{print $1}' || true)
+# 6. Networks (excluding external/public networks)
+echo "Cleaning ALL private networks..."
+network_ids=$(openstack network list --internal -f value -c ID 2>/dev/null || true)
 if [[ -n "${network_ids}" ]]; then
     echo "${network_ids}" | while read -r id; do
         [[ -z "${id}" ]] && continue
@@ -125,12 +123,12 @@ if [[ -n "${network_ids}" ]]; then
         openstack network delete "${id}" 2>/dev/null || echo "  Warning: Failed to delete ${id}"
     done
 else
-    echo "  No networks found with prefix '${TEST_PREFIX}'"
+    echo "  No private networks found"
 fi
 
-# 7. Security groups
-echo "Cleaning security groups..."
-sg_ids=$(openstack security group list -f value -c ID -c Name 2>/dev/null | grep "${TEST_PREFIX}" | awk '{print $1}' || true)
+# 7. Security groups (except "default" which OpenStack protects)
+echo "Cleaning ALL security groups (except default)..."
+sg_ids=$(openstack security group list -f value -c ID -c Name 2>/dev/null | grep -v " default$" | awk '{print $1}' || true)
 if [[ -n "${sg_ids}" ]]; then
     echo "${sg_ids}" | while read -r id; do
         [[ -z "${id}" ]] && continue
@@ -138,12 +136,12 @@ if [[ -n "${sg_ids}" ]]; then
         openstack security group delete "${id}" 2>/dev/null || echo "  Warning: Failed to delete ${id}"
     done
 else
-    echo "  No security groups found with prefix '${TEST_PREFIX}'"
+    echo "  No security groups found (except default)"
 fi
 
 # 8. Volumes
-echo "Cleaning volumes..."
-volume_ids=$(openstack volume list -f value -c ID -c Name 2>/dev/null | grep "${TEST_PREFIX}" | awk '{print $1}' || true)
+echo "Cleaning ALL volumes..."
+volume_ids=$(openstack volume list -f value -c ID 2>/dev/null || true)
 if [[ -n "${volume_ids}" ]]; then
     echo "${volume_ids}" | while read -r id; do
         [[ -z "${id}" ]] && continue
@@ -151,12 +149,12 @@ if [[ -n "${volume_ids}" ]]; then
         openstack volume delete "${id}" 2>/dev/null || echo "  Warning: Failed to delete ${id}"
     done
 else
-    echo "  No volumes found with prefix '${TEST_PREFIX}'"
+    echo "  No volumes found"
 fi
 
 # 9. Keypairs
-echo "Cleaning keypairs..."
-keypair_names=$(openstack keypair list -f value -c Name 2>/dev/null | grep "^${TEST_PREFIX}" || true)
+echo "Cleaning ALL keypairs..."
+keypair_names=$(openstack keypair list -f value -c Name 2>/dev/null || true)
 if [[ -n "${keypair_names}" ]]; then
     echo "${keypair_names}" | while read -r name; do
         [[ -z "${name}" ]] && continue
@@ -164,8 +162,8 @@ if [[ -n "${keypair_names}" ]]; then
         openstack keypair delete "${name}" 2>/dev/null || echo "  Warning: Failed to delete ${name}"
     done
 else
-    echo "  No keypairs found with prefix '${TEST_PREFIX}'"
+    echo "  No keypairs found"
 fi
 
 echo ""
-echo "Cleanup complete."
+echo "=== Environment nuked ==="
