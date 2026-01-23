@@ -92,7 +92,7 @@ func (c *Client) HasSwift() bool {
 // EnsureSwift returns the Swift client or an error if not available
 func (c *Client) EnsureSwift(ctx context.Context) (*gophercloud.ServiceClient, error) {
 	if c.ObjectStorageClient == nil {
-		return nil, fmt.Errorf("Swift object storage not available in this region")
+		return nil, fmt.Errorf("swift object storage not available in this region")
 	}
 	return c.ObjectStorageClient, nil
 }
