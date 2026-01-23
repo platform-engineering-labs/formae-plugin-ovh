@@ -222,7 +222,7 @@ func (n *Network) Read(ctx context.Context, request *resource.ReadRequest) (*res
 	if id == "" {
 		return &resource.ReadResult{
 			ErrorCode: resource.OperationErrorCodeInvalidRequest,
-		}, fmt.Errorf("nativeID is required")
+		}, nil // Don't return Go error for expected errors
 	}
 
 	// Get the network from OpenStack using ExtractInto to get MTU extension field
@@ -231,7 +231,7 @@ func (n *Network) Read(ctx context.Context, request *resource.ReadRequest) (*res
 	if err != nil {
 		return &resource.ReadResult{
 			ErrorCode: resources.MapOpenStackErrorToOperationErrorCode(err),
-		}, fmt.Errorf("failed to read network: %w", err)
+		}, nil // Don't return Go error for expected errors like NotFound
 	}
 
 	// Explicitly fetch tags - OpenStack often doesn't include them in the standard GET response
@@ -248,7 +248,7 @@ func (n *Network) Read(ctx context.Context, request *resource.ReadRequest) (*res
 	if err != nil {
 		return &resource.ReadResult{
 			ErrorCode: resource.OperationErrorCodeGeneralServiceException,
-		}, fmt.Errorf("failed to marshal properties: %w", err)
+		}, nil // Don't return Go error for expected errors
 	}
 
 	return &resource.ReadResult{

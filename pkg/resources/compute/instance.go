@@ -328,7 +328,7 @@ func (i *Instance) Read(ctx context.Context, request *resource.ReadRequest) (*re
 	if id == "" {
 		return &resource.ReadResult{
 			ErrorCode: resource.OperationErrorCodeInvalidRequest,
-		}, fmt.Errorf("nativeID is required")
+		}, nil // Don't return Go error for expected errors
 	}
 
 	// Get the server from OpenStack
@@ -336,7 +336,7 @@ func (i *Instance) Read(ctx context.Context, request *resource.ReadRequest) (*re
 	if err != nil {
 		return &resource.ReadResult{
 			ErrorCode: resources.MapOpenStackErrorToOperationErrorCode(err),
-		}, fmt.Errorf("failed to read instance: %w", err)
+		}, nil // Don't return Go error for expected errors like NotFound
 	}
 
 	// Fetch network attachments using the attachinterfaces API
@@ -385,7 +385,7 @@ func (i *Instance) Read(ctx context.Context, request *resource.ReadRequest) (*re
 	if err != nil {
 		return &resource.ReadResult{
 			ErrorCode: resource.OperationErrorCodeGeneralServiceException,
-		}, fmt.Errorf("failed to marshal properties: %w", err)
+		}, nil // Don't return Go error for expected errors
 	}
 
 	return &resource.ReadResult{
