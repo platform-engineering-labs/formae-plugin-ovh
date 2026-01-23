@@ -306,6 +306,15 @@ func (p *Port) Read(ctx context.Context, request *resource.ReadRequest) (*resour
 		}, fmt.Errorf("failed to read port: %w", err)
 	}
 
+	// Explicitly fetch tags - OpenStack often doesn't include them in the standard GET response
+	tags, err := attributestags.List(ctx, p.Client.NetworkClient, "ports", id).Extract()
+	if err != nil {
+		// Log warning but continue - tags are optional
+		fmt.Printf("warning: failed to fetch tags for port %s: %v\n", id, err)
+	} else {
+		port.Tags = tags
+	}
+
 	// Convert port to properties and marshal to JSON
 	propsJSON, err := resources.MarshalProperties(portToProperties(port))
 	if err != nil {

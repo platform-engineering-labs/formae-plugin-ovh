@@ -483,6 +483,97 @@ func TestRouter_CreateAndUpdate_WithTags_Integration(t *testing.T) {
 	t.Logf("  Tags: %v", updatedRouter.Tags)
 }
 
+func TestRouter_Read_WithTags_Integration(t *testing.T) {
+	testutil.SkipIfNotConfigured(t)
+	ctx := context.Background()
+
+	// Create Router provisioner
+	routerProvisioner := &Router{
+		Client: testClient,
+		Config: testClient.Config,
+	}
+
+	// Use a unique name for this test
+	timestamp := time.Now().Unix()
+	name := fmt.Sprintf("formae-test-router-read-tags-%d", timestamp)
+	expectedTags := []string{"env:test", "managed-by:formae", "test:read-tags"}
+
+	// Prepare resource properties with tags
+	properties := []byte(fmt.Sprintf(`{
+		"name": "%s",
+		"description": "Test router for read tags integration test",
+		"admin_state_up": true,
+		"tags": ["env:test", "managed-by:formae", "test:read-tags"]
+	}`, name))
+
+	// Create request
+	createReq := &resource.CreateRequest{
+		ResourceType: ResourceTypeRouter,
+		Label:        "test-router-tags",
+		Properties:   properties,
+		TargetConfig: testutil.TargetConfig,
+	}
+
+	// Execute plugin Create operation
+	createResult, err := routerProvisioner.Create(ctx, createReq)
+	require.NoError(t, err, "Create should not return an error")
+	require.NotNil(t, createResult, "Create result should not be nil")
+	require.NotNil(t, createResult.ProgressResult, "ProgressResult should not be nil")
+	require.Equal(t, resource.OperationStatusSuccess, createResult.ProgressResult.OperationStatus, "Create should succeed")
+
+	routerID := createResult.ProgressResult.NativeID
+
+	// Cleanup after test
+	defer func() {
+		_ = routers.Delete(ctx, networkClient, routerID).ExtractErr()
+		t.Logf("Cleaned up test router: %s", routerID)
+	}()
+
+	// Now read the router back and verify tags are returned
+	readReq := &resource.ReadRequest{
+		ResourceType: ResourceTypeRouter,
+		NativeID:     routerID,
+		TargetConfig: testutil.TargetConfig,
+	}
+
+	readResult, err := routerProvisioner.Read(ctx, readReq)
+	require.NoError(t, err, "Read should not return an error")
+	require.NotNil(t, readResult, "Read result should not be nil")
+	require.NotEmpty(t, readResult.Properties, "Properties should not be empty")
+
+	// Parse and verify properties including tags
+	var props map[string]interface{}
+	err = json.Unmarshal([]byte(readResult.Properties), &props)
+	require.NoError(t, err, "Should be able to unmarshal properties")
+
+	assert.Equal(t, routerID, props["id"])
+	assert.Equal(t, name, props["name"])
+
+	// Verify tags are present in the read result
+	tagsRaw, ok := props["tags"]
+	require.True(t, ok, "Tags should be present in read result")
+
+	tagsSlice, ok := tagsRaw.([]interface{})
+	require.True(t, ok, "Tags should be a slice")
+	require.Len(t, tagsSlice, len(expectedTags), "Should have correct number of tags")
+
+	// Convert to string slice for comparison
+	actualTags := make([]string, len(tagsSlice))
+	for i, tag := range tagsSlice {
+		actualTags[i] = tag.(string)
+	}
+
+	// Verify all expected tags are present (order may vary)
+	for _, expectedTag := range expectedTags {
+		assert.Contains(t, actualTags, expectedTag, "Should contain tag: %s", expectedTag)
+	}
+
+	t.Logf("Router read with tags successful:")
+	t.Logf("  ID: %s", props["id"])
+	t.Logf("  Name: %s", props["name"])
+	t.Logf("  Tags: %v", actualTags)
+}
+
 func TestRouter_List_Integration(t *testing.T) {
 	testutil.SkipIfNotConfigured(t)
 	ctx := context.Background()

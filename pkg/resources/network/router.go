@@ -234,6 +234,15 @@ func (r *Router) Read(ctx context.Context, request *resource.ReadRequest) (*reso
 		}, fmt.Errorf("failed to read router: %w", err)
 	}
 
+	// Explicitly fetch tags - OpenStack often doesn't include them in the standard GET response
+	tags, err := attributestags.List(ctx, r.Client.NetworkClient, "routers", id).Extract()
+	if err != nil {
+		// Log warning but continue - tags are optional
+		fmt.Printf("warning: failed to fetch tags for router %s: %v\n", id, err)
+	} else {
+		router.Tags = tags
+	}
+
 	// Convert router to properties and marshal to JSON
 	propsJSON, err := resources.MarshalProperties(routerToProperties(router))
 	if err != nil {

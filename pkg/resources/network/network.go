@@ -234,6 +234,15 @@ func (n *Network) Read(ctx context.Context, request *resource.ReadRequest) (*res
 		}, fmt.Errorf("failed to read network: %w", err)
 	}
 
+	// Explicitly fetch tags - OpenStack often doesn't include them in the standard GET response
+	tags, err := attributestags.List(ctx, n.Client.NetworkClient, "networks", id).Extract()
+	if err != nil {
+		// Log warning but continue - tags are optional
+		fmt.Printf("warning: failed to fetch tags for network %s: %v\n", id, err)
+	} else {
+		net.Tags = tags
+	}
+
 	// Convert network to properties and marshal to JSON
 	propsJSON, err := resources.MarshalProperties(networkToProperties(&net))
 	if err != nil {
