@@ -14,7 +14,7 @@ class SecurityGroupResources {
     /// Security group for web servers (HTTP/HTTPS access)
     hidden webSg: securitygroup.SecurityGroup = new {
         label = "lifeline-web-sg"
-        name = name + "-web-sg"
+        name = outer.name + "-web-sg"
         description = "Allow HTTP and HTTPS traffic to web servers"
     }
 
@@ -47,7 +47,7 @@ class SecurityGroupResources {
     /// Security group for SSH access (bastion/management)
     hidden sshSg: securitygroup.SecurityGroup = new {
         label = "lifeline-ssh-sg"
-        name = name + "-ssh-sg"
+        name = outer.name + "-ssh-sg"
         description = "Allow SSH access for management"
     }
 

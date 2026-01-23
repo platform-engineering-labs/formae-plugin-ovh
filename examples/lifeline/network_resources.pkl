@@ -19,7 +19,7 @@ class NetworkResources {
     /// Private network for the project (equivalent to AWS VPC)
     hidden network: network.Network = new {
         label = "lifeline-network"
-        name = name + "-network"
+        name = outer.name + "-network"
         description = "Private network for lifeline project"
         admin_state_up = true
     }
@@ -27,7 +27,7 @@ class NetworkResources {
     /// Subnet within the private network
     hidden subnet: subnet.Subnet = new {
         label = "lifeline-subnet"
-        name = name + "-subnet"
+        name = outer.name + "-subnet"
         description = "Main subnet for lifeline project"
         network_id = network.res.id
         cidr = subnetCidr
@@ -42,7 +42,7 @@ class NetworkResources {
     /// Router with external gateway (equivalent to AWS IGW + route table)
     hidden router: router.Router = new {
         label = "lifeline-router"
-        name = name + "-router"
+        name = outer.name + "-router"
         description = "Router for external connectivity"
         admin_state_up = true
         external_gateway_info = new router.GatewayInfo {
