@@ -299,6 +299,15 @@ func (s *Subnet) Read(ctx context.Context, request *resource.ReadRequest) (*reso
 		}, fmt.Errorf("failed to read subnet: %w", err)
 	}
 
+	// Explicitly fetch tags - OpenStack often doesn't include them in the standard GET response
+	tags, err := attributestags.List(ctx, s.Client.NetworkClient, "subnets", id).Extract()
+	if err != nil {
+		// Log warning but continue - tags are optional
+		fmt.Printf("warning: failed to fetch tags for subnet %s: %v\n", id, err)
+	} else {
+		subnet.Tags = tags
+	}
+
 	// Convert subnet to properties and marshal to JSON
 	propsJSON, err := resources.MarshalProperties(subnetToProperties(subnet))
 	if err != nil {

@@ -297,6 +297,97 @@ func TestNetwork_Delete_NotFound_Integration(t *testing.T) {
 	t.Logf("✓ Idempotent delete test passed (resource already gone)")
 }
 
+func TestNetwork_Read_WithTags_Integration(t *testing.T) {
+	testutil.SkipIfNotConfigured(t)
+	ctx := context.Background()
+
+	// Create Network provisioner
+	networkProvisioner := &Network{
+		Client: testClient,
+		Config: testClient.Config,
+	}
+
+	// Use a unique name for this test
+	timestamp := time.Now().Unix()
+	name := fmt.Sprintf("formae-test-network-read-tags-%d", timestamp)
+	expectedTags := []string{"env:test", "managed-by:formae", "test:read-tags"}
+
+	// Prepare resource properties with tags
+	properties := []byte(fmt.Sprintf(`{
+		"name": "%s",
+		"description": "Test network for read tags integration test",
+		"admin_state_up": true,
+		"tags": ["env:test", "managed-by:formae", "test:read-tags"]
+	}`, name))
+
+	// Create request
+	createReq := &resource.CreateRequest{
+		ResourceType: ResourceTypeNetwork,
+		Label:        "test-network-tags",
+		Properties:   properties,
+		TargetConfig: testutil.TargetConfig,
+	}
+
+	// Execute plugin Create operation
+	createResult, err := networkProvisioner.Create(ctx, createReq)
+	require.NoError(t, err, "Create should not return an error")
+	require.NotNil(t, createResult, "Create result should not be nil")
+	require.NotNil(t, createResult.ProgressResult, "ProgressResult should not be nil")
+	require.Equal(t, resource.OperationStatusSuccess, createResult.ProgressResult.OperationStatus, "Create should succeed")
+
+	networkID := createResult.ProgressResult.NativeID
+
+	// Cleanup after test
+	defer func() {
+		_ = networks.Delete(ctx, networkClient, networkID).ExtractErr()
+		t.Logf("Cleaned up test network: %s", networkID)
+	}()
+
+	// Now read the network back and verify tags are returned
+	readReq := &resource.ReadRequest{
+		ResourceType: ResourceTypeNetwork,
+		NativeID:     networkID,
+		TargetConfig: testutil.TargetConfig,
+	}
+
+	readResult, err := networkProvisioner.Read(ctx, readReq)
+	require.NoError(t, err, "Read should not return an error")
+	require.NotNil(t, readResult, "Read result should not be nil")
+	require.NotEmpty(t, readResult.Properties, "Properties should not be empty")
+
+	// Parse and verify properties including tags
+	var props map[string]interface{}
+	err = json.Unmarshal([]byte(readResult.Properties), &props)
+	require.NoError(t, err, "Should be able to unmarshal properties")
+
+	assert.Equal(t, networkID, props["id"])
+	assert.Equal(t, name, props["name"])
+
+	// Verify tags are present in the read result
+	tagsRaw, ok := props["tags"]
+	require.True(t, ok, "Tags should be present in read result")
+
+	tagsSlice, ok := tagsRaw.([]interface{})
+	require.True(t, ok, "Tags should be a slice")
+	require.Len(t, tagsSlice, len(expectedTags), "Should have correct number of tags")
+
+	// Convert to string slice for comparison
+	actualTags := make([]string, len(tagsSlice))
+	for i, tag := range tagsSlice {
+		actualTags[i] = tag.(string)
+	}
+
+	// Verify all expected tags are present (order may vary)
+	for _, expectedTag := range expectedTags {
+		assert.Contains(t, actualTags, expectedTag, "Should contain tag: %s", expectedTag)
+	}
+
+	t.Logf("Network read with tags successful:")
+	t.Logf("  ID: %s", props["id"])
+	t.Logf("  Name: %s", props["name"])
+	t.Logf("  Tags: %v", actualTags)
+}
+
 func TestNetwork_List_Integration(t *testing.T) {
 	testutil.SkipIfNotConfigured(t)
 	ctx := context.Background()
