@@ -1,0 +1,101 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module securitygrouprule
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Network::SecurityGroupRule"
+
+/// Resolvable reference to a SecurityGroupRule resource
+/// Use this to reference a security group rule's properties in dependent resources
+open class SecurityGroupRuleResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  /// The rule's unique identifier
+  hidden id: SecurityGroupRuleResolvable = (this) {
+    property = "id"
+  }
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class SecurityGroupRule extends formae.Resource {
+  /// The security group ID this rule belongs to (required, createOnly)
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  security_group_id: String|formae.Resolvable
+
+  /// Traffic direction: "ingress" or "egress" (required, createOnly)
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  direction: "ingress"|"egress"
+
+  /// IP version: "IPv4" or "IPv6" (required, createOnly)
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  ethertype: "IPv4"|"IPv6"
+
+  /// Protocol: "tcp", "udp", "icmp", or null for any (optional, createOnly)
+  @ovh.FieldHint {
+    required = false
+    createOnly = true
+  }
+  protocol: String?
+
+  /// Start of port range (optional, createOnly)
+  @ovh.FieldHint {
+    required = false
+    createOnly = true
+  }
+  port_range_min: Int?
+
+  /// End of port range (optional, createOnly)
+  @ovh.FieldHint {
+    required = false
+    createOnly = true
+  }
+  port_range_max: Int?
+
+  /// CIDR for remote IP prefix, e.g. "0.0.0.0/0" (optional, createOnly)
+  @ovh.FieldHint {
+    required = false
+    createOnly = true
+  }
+  remote_ip_prefix: String?
+
+  /// Reference to another security group for group-based rules (optional, createOnly)
+  @ovh.FieldHint {
+    required = false
+    createOnly = true
+  }
+  remote_group_id: (String|formae.Resolvable)?
+
+  /// Human-readable description (optional, mutable)
+  @ovh.FieldHint {
+    required = false
+  }
+  description: String?
+
+  // id is computed by OpenStack - not user-provided
+
+  local parent = this
+
+  /// Provides resolvable references to this security group rule's properties
+  hidden res: SecurityGroupRuleResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}
