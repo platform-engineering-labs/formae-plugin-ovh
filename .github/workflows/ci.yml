@@ -133,6 +133,9 @@ jobs:
           echo "OS_PASSWORD=${{ secrets.OS_PASSWORD }}" >> $GITHUB_ENV
           echo "OS_PROJECT_ID=${{ secrets.OS_PROJECT_ID }}" >> $GITHUB_ENV
           echo "OS_REGION_NAME=${{ secrets.OS_REGION_NAME }}" >> $GITHUB_ENV
+          echo "OS_USER_DOMAIN_NAME=${{ secrets.OS_USER_DOMAIN_NAME }}" >> $GITHUB_ENV
+          echo "OS_PROJECT_DOMAIN_NAME=${{ secrets.OS_PROJECT_DOMAIN_NAME }}" >> $GITHUB_ENV
+          echo "OS_IDENTITY_API_VERSION=3" >> $GITHUB_ENV
 
       - name: Install OpenStack CLI
         run: pip install python-openstackclient
