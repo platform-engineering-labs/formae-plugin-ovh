@@ -5,6 +5,7 @@
 package client
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/gophercloud/gophercloud/v2"
@@ -17,9 +18,10 @@ type Client struct {
 	Config *config.Config
 
 	// OpenStack service clients
-	ComputeClient *gophercloud.ServiceClient // Nova - instances, keypairs, flavors
-	NetworkClient *gophercloud.ServiceClient // Neutron - networks, subnets, security groups
-	VolumeClient  *gophercloud.ServiceClient // Cinder - volumes, snapshots
+	ComputeClient       *gophercloud.ServiceClient // Nova - instances, keypairs, flavors
+	NetworkClient       *gophercloud.ServiceClient // Neutron - networks, subnets, security groups
+	VolumeClient        *gophercloud.ServiceClient // Cinder - volumes, snapshots
+	ObjectStorageClient *gophercloud.ServiceClient // Swift - containers, objects (may be nil if not available)
 
 	// Provider client (for token refresh, etc.)
 	provider *gophercloud.ProviderClient
@@ -61,11 +63,73 @@ func NewClient(cfg *config.Config) (*Client, error) {
 		return nil, fmt.Errorf("failed to create volume client: %w", err)
 	}
 
-	return &Client{
+	client := &Client{
 		Config:        cfg,
 		ComputeClient: computeClient,
 		NetworkClient: networkClient,
 		VolumeClient:  volumeClient,
 		provider:      provider,
-	}, nil
+	}
+
+	// Try to create object storage service client (Swift) - may not be available in all regions
+	// Map region to Swift region format (e.g., DE1 -> DE, GRA11 -> GRA)
+	swiftRegion := mapRegionToSwiftRegion(cfg.Region)
+	objectStorageClient, err := openstack.NewObjectStorageV1(provider, gophercloud.EndpointOpts{
+		Region: swiftRegion,
+	})
+	if err == nil {
+		client.ObjectStorageClient = objectStorageClient
+	}
+
+	return client, nil
+}
+
+// HasSwift returns true if Swift object storage client is available
+func (c *Client) HasSwift() bool {
+	return c.ObjectStorageClient != nil
+}
+
+// EnsureSwift returns the Swift client or an error if not available
+func (c *Client) EnsureSwift(ctx context.Context) (*gophercloud.ServiceClient, error) {
+	if c.ObjectStorageClient == nil {
+		return nil, fmt.Errorf("Swift object storage not available in this region")
+	}
+	return c.ObjectStorageClient, nil
+}
+
+// mapRegionToSwiftRegion converts OpenStack region codes to Swift region codes
+// Swift uses region names without version suffixes (e.g., DE1 -> DE, GRA11 -> GRA)
+func mapRegionToSwiftRegion(region string) string {
+	// Map of OpenStack regions to Swift regions
+	regionMap := map[string]string{
+		// Germany / Frankfurt
+		"DE1": "DE",
+		// France / Gravelines
+		"GRA1":  "GRA",
+		"GRA3":  "GRA",
+		"GRA5":  "GRA",
+		"GRA7":  "GRA",
+		"GRA9":  "GRA",
+		"GRA11": "GRA",
+		// France / Strasbourg
+		"SBG1": "SBG",
+		"SBG3": "SBG",
+		"SBG5": "SBG",
+		// Canada / Beauharnois
+		"BHS1": "BHS",
+		"BHS3": "BHS",
+		"BHS5": "BHS",
+		// UK / London
+		"UK1": "UK",
+		// Poland / Warsaw
+		"WAW1": "WAW",
+		// US / Virginia
+		"US-EAST-VA-1": "US-EAST-VA",
+	}
+
+	if swiftRegion, ok := regionMap[region]; ok {
+		return swiftRegion
+	}
+	// If not found, return as-is (might already be correct format)
+	return region
 }

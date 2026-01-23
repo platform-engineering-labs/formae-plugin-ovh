@@ -17,6 +17,7 @@ import (
 	// Import resources to trigger init() registration
 	_ "github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/compute"
 	_ "github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/network"
+	_ "github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/storage"
 	_ "github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/volume"
 )
 

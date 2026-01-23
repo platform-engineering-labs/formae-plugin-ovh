@@ -1,0 +1,70 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module container
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::ObjectStorage::Container"
+
+/// Resolvable reference to a Container resource
+/// Use this to reference a container's properties in dependent resources
+open class ContainerResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  /// The container's name (also serves as the unique identifier)
+  hidden name: ContainerResolvable = (this) {
+    property = "name"
+  }
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "name"
+}
+open class Container extends formae.Resource {
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  name: String
+
+  /// Read ACL for the container
+  @ovh.FieldHint {
+    required = false
+  }
+  read_acl: String?
+
+  /// Write ACL for the container
+  @ovh.FieldHint {
+    required = false
+  }
+  write_acl: String?
+
+  @ovh.FieldHint {
+    required = false
+  }
+  metadata: Mapping<String, String>?
+
+  /// Storage policy
+  @ovh.FieldHint {
+    required = false
+    createOnly = true
+  }
+  storage_policy: String?
+
+  // bytes_used is computed by OpenStack - not user-provided
+  // object_count is computed by OpenStack - not user-provided
+
+  local parent = this
+
+  /// Provides resolvable references to this container's properties
+  hidden res: ContainerResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}
