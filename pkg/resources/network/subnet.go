@@ -35,9 +35,12 @@ var (
 	SubnetSchema = model.Schema{
 		Identifier:   "id",
 		Discoverable: true,
-		Fields:       []string{"name", "network_id", "cidr", "ip_version", "gateway_ip", "enable_dhcp", "dns_nameservers", "allocation_pools", "tags"},
+		Fields:       []string{"name", "description", "network_id", "cidr", "ip_version", "gateway_ip", "enable_dhcp", "dns_nameservers", "allocation_pools", "tags"},
 		Hints: map[string]model.FieldHint{
 			"name": {
+				Required: false,
+			},
+			"description": {
 				Required: false,
 			},
 			"network_id": {
@@ -89,6 +92,11 @@ func subnetToProperties(subnet *subnets.Subnet) map[string]interface{} {
 		"ip_version":  subnet.IPVersion,
 		"gateway_ip":  subnet.GatewayIP,
 		"enable_dhcp": subnet.EnableDHCP,
+	}
+
+	// Add description if present
+	if subnet.Description != "" {
+		props["description"] = subnet.Description
 	}
 
 	// Always include dns_nameservers - if OpenStack returns empty/nil, include empty array
@@ -160,6 +168,11 @@ func (s *Subnet) Create(ctx context.Context, request *resource.CreateRequest) (*
 	// Add optional name
 	if name, ok := props["name"].(string); ok && name != "" {
 		createOpts.Name = name
+	}
+
+	// Add optional description
+	if description, ok := props["description"].(string); ok {
+		createOpts.Description = description
 	}
 
 	// Add optional ip_version (defaults to 4 if not specified)
@@ -324,6 +337,10 @@ func (s *Subnet) Update(ctx context.Context, request *resource.UpdateRequest) (*
 	// Update mutable fields
 	if name, ok := props["name"].(string); ok {
 		updateOpts.Name = &name
+	}
+
+	if description, ok := props["description"].(string); ok {
+		updateOpts.Description = &description
 	}
 
 	if gatewayIP, ok := props["gateway_ip"].(string); ok {
