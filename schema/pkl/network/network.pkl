@@ -62,7 +62,7 @@ open class Network extends formae.Resource {
   @ovh.FieldHint {
     required = false
   }
-  tags: Listing<String>?
+  tags: Listing<String>? = new Listing {}
 
   // id is computed by OpenStack - not user-provided
 
