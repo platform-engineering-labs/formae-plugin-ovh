@@ -203,7 +203,7 @@ func (v *Volume) Read(ctx context.Context, request *resource.ReadRequest) (*reso
 	if id == "" {
 		return &resource.ReadResult{
 			ErrorCode: resource.OperationErrorCodeInvalidRequest,
-		}, fmt.Errorf("nativeID is required")
+		}, nil // Don't return Go error for expected errors
 	}
 
 	// Get the volume from OpenStack
@@ -211,7 +211,7 @@ func (v *Volume) Read(ctx context.Context, request *resource.ReadRequest) (*reso
 	if err != nil {
 		return &resource.ReadResult{
 			ErrorCode: resources.MapOpenStackErrorToOperationErrorCode(err),
-		}, fmt.Errorf("failed to read volume: %w", err)
+		}, nil // Don't return Go error for expected errors like NotFound
 	}
 
 	// Convert volume to properties
@@ -246,7 +246,7 @@ func (v *Volume) Read(ctx context.Context, request *resource.ReadRequest) (*reso
 	if err != nil {
 		return &resource.ReadResult{
 			ErrorCode: resource.OperationErrorCodeGeneralServiceException,
-		}, fmt.Errorf("failed to marshal properties: %w", err)
+		}, nil // Don't return Go error for expected errors
 	}
 
 	return &resource.ReadResult{

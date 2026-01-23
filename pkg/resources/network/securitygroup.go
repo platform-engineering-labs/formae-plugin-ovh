@@ -180,7 +180,7 @@ func (s *SecurityGroup) Read(ctx context.Context, request *resource.ReadRequest)
 	if id == "" {
 		return &resource.ReadResult{
 			ErrorCode: resource.OperationErrorCodeInvalidRequest,
-		}, fmt.Errorf("nativeID is required")
+		}, nil // Don't return Go error for expected errors
 	}
 
 	// Get the security group from OpenStack
@@ -188,7 +188,7 @@ func (s *SecurityGroup) Read(ctx context.Context, request *resource.ReadRequest)
 	if err != nil {
 		return &resource.ReadResult{
 			ErrorCode: resources.MapOpenStackErrorToOperationErrorCode(err),
-		}, fmt.Errorf("failed to read security group: %w", err)
+		}, nil // Don't return Go error for expected errors like NotFound
 	}
 
 	// Convert security group to properties and marshal to JSON
@@ -196,7 +196,7 @@ func (s *SecurityGroup) Read(ctx context.Context, request *resource.ReadRequest)
 	if err != nil {
 		return &resource.ReadResult{
 			ErrorCode: resource.OperationErrorCodeGeneralServiceException,
-		}, fmt.Errorf("failed to marshal properties: %w", err)
+		}, nil // Don't return Go error for expected errors
 	}
 
 	return &resource.ReadResult{

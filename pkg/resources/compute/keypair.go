@@ -125,7 +125,7 @@ func (k *Keypair) Read(ctx context.Context, request *resource.ReadRequest) (*res
 	if name == "" {
 		return &resource.ReadResult{
 			ErrorCode: resource.OperationErrorCodeInvalidRequest,
-		}, fmt.Errorf("nativeID is required")
+		}, nil // Don't return Go error for expected errors
 	}
 
 	// Get the keypair from OpenStack
@@ -133,7 +133,7 @@ func (k *Keypair) Read(ctx context.Context, request *resource.ReadRequest) (*res
 	if err != nil {
 		return &resource.ReadResult{
 			ErrorCode: resources.MapOpenStackErrorToOperationErrorCode(err),
-		}, fmt.Errorf("failed to read keypair: %w", err)
+		}, nil // Don't return Go error for expected errors like NotFound
 	}
 
 	// Convert keypair to properties
@@ -148,7 +148,7 @@ func (k *Keypair) Read(ctx context.Context, request *resource.ReadRequest) (*res
 	if err != nil {
 		return &resource.ReadResult{
 			ErrorCode: resource.OperationErrorCodeGeneralServiceException,
-		}, err
+		}, nil // Don't return Go error for expected errors
 	}
 
 	return &resource.ReadResult{
