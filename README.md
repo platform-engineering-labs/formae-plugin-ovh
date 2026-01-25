@@ -1,229 +1,130 @@
-# Formae Plugin Template
+# OVH Cloud Plugin for Formae
 
-Template repository for creating formae resource plugins.
+[![CI](https://github.com/platform-engineering-labs/formae-plugin-ovh/actions/workflows/ci.yml/badge.svg)](https://github.com/platform-engineering-labs/formae-plugin-ovh/actions/workflows/ci.yml)
 
-> **Note:** Don't use GitHub's "Use this template" button. Instead, use the Formae CLI
-> which will prompt for your plugin details and set everything up correctly:
->
-> ```bash
-> formae plugin init my-plugin
-> ```
+OVH Cloud resource plugin for [Formae](https://github.com/platform-engineering-labs/formae). This plugin enables Formae to manage OVH Public Cloud resources using the OpenStack APIs via [gophercloud](https://github.com/gophercloud/gophercloud).
 
-## Quick Start
+## Installation
 
-1. **Create plugin**: `formae plugin init <name>` (prompts for namespace, license, etc.)
-2. **Define resources** in `schema/pkl/*.pkl`
-3. **Implement CRUD operations** in `plugin.go`
-4. **Build and test**: `make build && make test`
-
-## Project Structure
-
-```
-.
-├── formae-plugin.pkl      # Plugin manifest (name, version, namespace)
-├── plugin.go              # Your ResourcePlugin implementation
-├── main.go                # Entry point (don't modify)
-├── schema/pkl/            # Pkl resource schemas
-│   ├── PklProject
-│   └── example.pkl
-├── examples/              # Usage examples
-├── scripts/
-│   ├── ci/                # CI hook scripts
-│   │   ├── setup-credentials.sh
-│   │   └── clean-environment.sh
-│   └── run-conformance-tests.sh
-├── go.mod
-├── Makefile
-└── README.md
+```bash
+# Install the plugin
+make install
 ```
 
-## What You Implement
+## Supported Resources
 
-You only implement the `ResourcePlugin` interface in `plugin.go`:
+This plugin supports **10 OVH Public Cloud resource types** across 3 services:
 
-```go
-type Plugin struct{}
+| Service | Resources | Description |
+|---------|-----------|-------------|
+| Compute | Instance, Keypair | Virtual machines and SSH keys |
+| Network | Network, Subnet, Port, Router, FloatingIP, SecurityGroup, SecurityGroupRule | Virtual networking components |
+| Volume | Volume | Block storage volumes |
 
-// Configuration
-func (p *Plugin) RateLimit() plugin.RateLimitConfig { ... }
-func (p *Plugin) DiscoveryFilters() []plugin.MatchFilter { ... }
-func (p *Plugin) LabelConfig() plugin.LabelConfig { ... }
+See [`schema/pkl/`](schema/pkl/) for the complete list of supported resource types.
 
-// CRUD Operations
-func (p *Plugin) Create(ctx, req) (*CreateResult, error) { ... }
-func (p *Plugin) Read(ctx, req) (*ReadResult, error) { ... }
-func (p *Plugin) Update(ctx, req) (*UpdateResult, error) { ... }
-func (p *Plugin) Delete(ctx, req) (*DeleteResult, error) { ... }
-func (p *Plugin) Status(ctx, req) (*StatusResult, error) { ... }
-func (p *Plugin) List(ctx, req) (*ListResult, error) { ... }
+## Configuration
+
+### Target Configuration
+
+Configure an OVH target in your Forma file:
+
+```pkl
+import "@formae/formae.pkl"
+import "@ovh/ovh.pkl"
+
+target: formae.Target = new formae.Target {
+    label = "ovh-target"
+    config = new ovh.Config {
+        authURL = "https://auth.cloud.ovh.net/v3"  // EU regions
+        // authURL = "https://auth.cloud.ovh.us/v3"  // US regions
+        region = "GRA7"  // See supported regions below
+    }
+}
 ```
 
-**The SDK handles everything else:**
-- Plugin identity (name, version, namespace) → read from `formae-plugin.pkl`
-- Schema extraction → auto-discovered from `schema/pkl/`
-- Resource descriptors → generated from Pkl schemas
+**Supported Regions:**
+- `BHS5` - Beauharnois, Canada
+- `DE1` - Frankfurt, Germany
+- `GRA7`, `GRA9` - Gravelines, France
+- `SBG5` - Strasbourg, France
+- `UK1` - London, UK
+- `WAW1` - Warsaw, Poland
+- `US-EAST-VA-1` - Virginia, USA
+
+### Credentials
+
+The plugin uses OpenStack environment variables for authentication. Credentials are never stored in the target config.
+
+**Required Environment Variables:**
+```bash
+export OS_USERNAME="your-openstack-username"
+export OS_PASSWORD="your-openstack-password"
+export OS_PROJECT_ID="your-project-id"
+export OS_USER_DOMAIN_NAME="Default"  # Optional, defaults to "Default"
+```
+
+**Getting Credentials from OVH:**
+1. Go to the [OVH Control Panel](https://www.ovh.com/manager/)
+2. Navigate to Public Cloud > Project > Users & Roles
+3. Create a new user or use an existing one
+4. Download the OpenStack RC file or note the credentials
+
+## Examples
+
+See the [examples/](examples/) directory for usage examples.
+
+```bash
+# Evaluate an example
+formae eval examples/lifeline/basic_infrastructure.pkl
+
+# Apply resources
+formae apply --mode reconcile --watch examples/lifeline/basic_infrastructure.pkl
+```
 
 ## Development
 
 ### Prerequisites
 
 - Go 1.25+
-- [Pkl CLI](https://pkl-lang.org/main/current/pkl-cli/index.html)
+- [Pkl CLI](https://pkl-lang.org/main/current/pkl-cli/index.html) 0.30+
+- OVH Public Cloud credentials (for integration/conformance testing)
 
 ### Building
 
 ```bash
 make build      # Build plugin binary
-make test       # Run unit tests
-make lint       # Run linter (requires golangci-lint)
-make install    # Build + install locally for testing
+make test-unit  # Run unit tests
+make lint       # Run linter
+make install    # Build + install locally
 ```
 
 ### Local Testing
 
 ```bash
-# Install plugin and schemas locally
+# Install plugin locally
 make install
 
-# Start formae agent (discovers the plugin)
+# Start formae agent
 formae agent start
 
 # Apply example resources
-formae apply examples/basic/main.pkl
+formae apply --mode reconcile --watch examples/lifeline/basic_infrastructure.pkl
 ```
 
 ### Conformance Testing
 
-Run the full conformance test suite (CRUD lifecycle + discovery) against a specific formae version:
+Run the full CRUD lifecycle + discovery tests:
 
 ```bash
-# Run conformance tests with latest stable version
-make conformance-test
-
-# Run conformance tests with a specific version
-make conformance-test VERSION=0.77.0
+make conformance-test                  # Latest formae version
+make conformance-test VERSION=0.77.9   # Specific version
 ```
 
-The conformance tests:
-1. Call `setup-credentials` to provision cloud credentials
-2. Call `clean-environment` to remove orphaned resources from previous runs
-3. Build and install the plugin locally
-4. Download the specified formae version (defaults to latest)
-5. Run CRUD lifecycle tests for each resource type
-6. Run discovery tests to verify resource detection
-7. Call `clean-environment` to clean up test resources
-
-### CI Hooks
-
-The template includes hook scripts that you customize for your cloud provider:
-
-#### `scripts/ci/setup-credentials.sh`
-
-Provisions credentials for your cloud provider. Called before running conformance tests.
-
-**Examples:**
-- AWS: Verify `AWS_ACCESS_KEY_ID` is set or use OIDC
-- OpenStack: Source your RC file and verify required env vars
-- Azure: Run `az login` or verify OIDC credentials
-- GCP: Run `gcloud auth` or verify workload identity
-
-#### `scripts/ci/clean-environment.sh`
-
-Cleans up test resources in your cloud environment. Called before AND after conformance tests to:
-- Remove orphaned resources from previous failed runs (pre-cleanup)
-- Clean up resources created during the test run (post-cleanup)
-
-The script should be idempotent and delete all resources under the /testdata folder
-
-#### GitHub Actions
-
-The `.github/workflows/ci.yml` workflow includes a `conformance-tests` job that is
-disabled by default. To enable it:
-
-1. Configure credentials for your cloud provider in the workflow
-2. Implement the hook scripts for local verification
-3. Set `run_conformance` to `true` when triggering the workflow, or modify the `if` condition
-
-See the workflow file for credential configuration examples for AWS, Azure, GCP, and OpenStack.
-
-## Defining Resources (Pkl)
-
-Create resource classes in `schema/pkl/`:
-
-```pkl
-@formae.ResourceHint {
-    type = "MYPROVIDER::Service::Resource"
-    identifier = "$.Id"
-}
-class MyResource extends formae.Resource {
-    @formae.FieldHint {}
-    name: String
-
-    @formae.FieldHint { createOnly = true }
-    region: String?
-}
-```
-
-## Plugin Manifest
-
-All plugin metadata lives in `formae-plugin.pkl`:
-
-```pkl
-amends "@formae/plugin-manifest.pkl"
-
-name = "myprovider"           # Plugin identifier
-version = "1.0.0"             # Semantic version
-description = "My cloud provider plugin"
-
-spec {
-    protocolVersion = 1       # SDK protocol version
-    namespace = "MYPROVIDER"  # Resource type prefix
-    capabilities { "create"; "read"; "update"; "delete"; "list"; "discovery" }
-}
-```
-
-## Async (long-running) Operations
-
-All plugin operations return the `ProgressResult` struct. For async (long-running) operations
-return `InProgress` with a `RequestID`. The formae agent will call the `Status` method on
-a regular interval to request the status of the operation.
-
-```go
-func (p *Plugin) Create(ctx context.Context, req *resource.CreateRequest) (*resource.CreateResult, error) {
-    operationID := startAsyncCreate(...)
-
-    return &resource.CreateResult{
-        ProgressResult: &resource.ProgressResult{
-            Operation:       resource.OperationCreate,
-            OperationStatus: resource.OperationStatusInProgress,
-            RequestID:       operationID,
-        },
-    }, nil
-}
-
-func (p *Plugin) Status(ctx context.Context, req *resource.StatusRequest) (*resource.StatusResult, error) {
-    status := checkOperation(req.RequestID)
-    if status.Complete {
-        return &resource.StatusResult{
-            ProgressResult: &resource.ProgressResult{
-                OperationStatus: resource.OperationStatusSuccess,
-                NativeID:        status.ResourceID,
-            },
-        }, nil
-    }
-    // Still in progress - return InProgress status
-}
-```
+The `scripts/ci/clean-environment.sh` script cleans up test resources. It runs before and after conformance tests and is idempotent.
 
 ## License
 
-This template is licensed under FSL-1.1-ALv2 - See [LICENSE](LICENSE)
+This plugin is licensed under the [Functional Source License, Version 1.1, ALv2 Future License (FSL-1.1-ALv2)](LICENSE).
 
-When creating your own plugin, choose an appropriate license for your project.
-Common choices include:
-- **MIT** - Most permissive
-- **Apache-2.0** - Permissive with patent grant (recommended)
-- **MPL-2.0** - Weak copyleft
-- **FSL-1.1-ALv2** - Functional Source License
-
-Replace the LICENSE file with your chosen license when you create your plugin.
+Copyright 2025 Platform Engineering Labs Inc.
