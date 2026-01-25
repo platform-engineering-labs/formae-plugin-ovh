@@ -1,5 +1,7 @@
 # Formae Plugin Template
 
+[![CI](https://github.com/platform-engineering-labs/formae-plugin-ovh/actions/workflows/ci.yml/badge.svg)](https://github.com/platform-engineering-labs/formae-plugin-ovh/actions/workflows/ci.yml)
+
 Template repository for creating formae resource plugins.
 
 > **Note:** Don't use GitHub's "Use this template" button. Instead, use the Formae CLI
