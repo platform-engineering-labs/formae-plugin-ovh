@@ -91,9 +91,11 @@ func networkToProperties(net *networkWithMTU) map[string]interface{} {
 		props["mtu"] = net.MTU
 	}
 
-	// Add tags if present
+	// Always include tags - use empty list if none (matches schema default)
 	if len(net.Tags) > 0 {
 		props["tags"] = net.Tags
+	} else {
+		props["tags"] = []string{}
 	}
 
 	return props
