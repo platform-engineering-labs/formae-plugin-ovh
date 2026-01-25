@@ -100,17 +100,23 @@ else
     echo "  No user ports found"
 fi
 
-# 5. Subnets
-echo "Cleaning ALL subnets..."
-subnet_ids=$(openstack subnet list -f value -c ID 2>/dev/null || true)
-if [[ -n "${subnet_ids}" ]]; then
-    echo "${subnet_ids}" | while read -r id; do
-        [[ -z "${id}" ]] && continue
-        echo "  Deleting subnet: ${id}"
-        openstack subnet delete "${id}" 2>/dev/null || echo "  Warning: Failed to delete ${id}"
+# 5. Subnets (only from internal/private networks, skip external/provider-managed subnets like Ext-Net)
+# Must delete subnets before their parent networks
+echo "Cleaning subnets from private networks..."
+internal_network_ids=$(openstack network list --internal -f value -c ID 2>/dev/null || true)
+if [[ -n "${internal_network_ids}" ]]; then
+    for net_id in ${internal_network_ids}; do
+        subnet_ids=$(openstack subnet list --network "${net_id}" -f value -c ID 2>/dev/null || true)
+        if [[ -n "${subnet_ids}" ]]; then
+            echo "${subnet_ids}" | while read -r id; do
+                [[ -z "${id}" ]] && continue
+                echo "  Deleting subnet: ${id} (from network ${net_id})"
+                openstack subnet delete "${id}" 2>/dev/null || echo "  Warning: Failed to delete ${id}"
+            done
+        fi
     done
 else
-    echo "  No subnets found"
+    echo "  No private networks found"
 fi
 
 # 6. Networks (excluding external/public networks)
