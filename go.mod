@@ -4,9 +4,9 @@ go 1.25
 
 require (
 	github.com/gophercloud/gophercloud/v2 v2.10.0
-	github.com/platform-engineering-labs/formae/pkg/model v0.0.0-20260122175017-38e3018820c0
+	github.com/platform-engineering-labs/formae/pkg/model v0.1.1
 	github.com/platform-engineering-labs/formae/pkg/plugin v0.1.2
-	github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.1.4
+	github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.1.5
 	github.com/stretchr/testify v1.11.1
 )
 
@@ -22,7 +22,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.3 // indirect
 	github.com/masterminds/semver v1.5.0 // indirect
-	github.com/platform-engineering-labs/formae/pkg/api/model v0.0.0-20260120041653-c26026025caf // indirect
+	github.com/platform-engineering-labs/formae/pkg/api/model v0.1.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/theory/jsonpath v0.10.2 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
