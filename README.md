@@ -87,17 +87,37 @@ target: formae.Target = new formae.Target {
 
 ### Credentials
 
-The plugin uses OpenStack environment variables for authentication. Credentials are never stored in the target config.
+This plugin requires **two sets of credentials**:
 
-**Required Environment Variables:**
+1. **OVH Cloud API** — for OVH-specific resources (DNS, Database, Kube, Registry)
+2. **OpenStack API** — for infrastructure resources (Compute, Network, Storage)
+
+#### OVH Cloud API Credentials
+
+```bash
+export OVH_ENDPOINT="ovh-eu"              # Optional: ovh-eu (default), ovh-ca, ovh-us
+export OVH_APPLICATION_KEY="your-app-key"
+export OVH_APPLICATION_SECRET="your-app-secret"
+export OVH_CONSUMER_KEY="your-consumer-key"
+export OVH_CLOUD_PROJECT_ID="your-project-id"
+```
+
+**Getting OVH API Credentials:**
+1. Go to [OVH API Token Creation](https://eu.api.ovh.com/createToken/) (use appropriate region)
+2. Create an application with the required permissions
+3. Note the Application Key, Application Secret, and Consumer Key
+4. Find your Cloud Project ID in the [OVH Control Panel](https://www.ovh.com/manager/) under Public Cloud
+
+#### OpenStack API Credentials
+
 ```bash
 export OS_USERNAME="your-openstack-username"
 export OS_PASSWORD="your-openstack-password"
 export OS_PROJECT_ID="your-project-id"
-export OS_USER_DOMAIN_NAME="Default"  # Optional, defaults to "Default"
+export OS_USER_DOMAIN_NAME="Default"       # Optional, defaults to "Default"
 ```
 
-**Getting Credentials from OVH:**
+**Getting OpenStack Credentials:**
 1. Go to the [OVH Control Panel](https://www.ovh.com/manager/)
 2. Navigate to Public Cloud > Project > Users & Roles
 3. Create a new user or use an existing one
