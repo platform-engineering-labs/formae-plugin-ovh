@@ -128,3 +128,4 @@ The `scripts/ci/clean-environment.sh` script cleans up test resources. It runs b
 This plugin is licensed under the [Functional Source License, Version 1.1, ALv2 Future License (FSL-1.1-ALv2)](LICENSE).
 
 Copyright 2025 Platform Engineering Labs Inc.
+
