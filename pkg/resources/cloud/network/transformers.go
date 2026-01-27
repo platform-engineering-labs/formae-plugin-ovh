@@ -127,26 +127,6 @@ func (t *subnetPrivateRequestTransformer) Transform(props map[string]interface{}
 
 var subnetPrivateTransformer = &subnetPrivateRequestTransformer{}
 
-// subnetRegionalRequestTransformer strips network_id from the request body.
-// For regional subnets, network_id is used in the URL path, not the body.
-type subnetRegionalRequestTransformer struct{}
-
-func (t *subnetRegionalRequestTransformer) Transform(props map[string]interface{}, ctx base.TransformContext) (map[string]interface{}, error) {
-	result := make(map[string]interface{})
-
-	// Copy all fields except network_id (used in URL path)
-	for k, v := range props {
-		if k == "network_id" {
-			continue
-		}
-		result[k] = v
-	}
-
-	return result, nil
-}
-
-var subnetRegionalTransformer = &subnetRegionalRequestTransformer{}
-
 // privateNetworkResponseTransformer simplifies the regions field in the response.
 // OVH API returns regions as [{openstackId, region, status}, ...] but we only need ["DE1", ...]
 type privateNetworkResponseTransformer struct{}

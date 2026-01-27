@@ -35,16 +35,6 @@ func gatewayStatusChecker(resourceData map[string]interface{}) (bool, error) {
 	return status == "ACTIVE", nil
 }
 
-// subnetStatusChecker verifies subnet is ready.
-// OVH subnet creation is synchronous, but we check for ID presence as a safety measure.
-func subnetStatusChecker(resourceData map[string]interface{}) (bool, error) {
-	// Subnet is ready if it has an ID (creation is synchronous)
-	if id, ok := resourceData["id"].(string); ok && id != "" {
-		return true, nil
-	}
-	return false, nil
-}
-
 // privateNetworkStatusChecker verifies all regions have ACTIVE status.
 // OVH private networks require region activation before subnets can be created.
 func privateNetworkStatusChecker(resourceData map[string]interface{}) (bool, error) {

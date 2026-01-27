@@ -128,9 +128,7 @@ func (b *BaseResource) Create(ctx context.Context, request *resource.CreateReque
 
 	// Execute post-mutation hook (e.g., zone refresh)
 	if b.OperationConfig.PostMutationHook != nil {
-		if err := b.OperationConfig.PostMutationHook(pathCtx); err != nil {
-			// Log but don't fail - resource was created
-		}
+		_ = b.OperationConfig.PostMutationHook(pathCtx) // Log but don't fail - resource was created
 	}
 
 	// Transform response
