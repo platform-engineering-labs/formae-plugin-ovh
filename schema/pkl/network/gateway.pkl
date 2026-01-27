@@ -1,0 +1,95 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// OVH Cloud Gateway
+/// API: POST /cloud/project/{serviceName}/region/{regionName}/gateway
+module ovh.network.gateway
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Network::Gateway"
+
+/// Gateway model sizes
+typealias GatewayModel = "s"|"m"|"l"
+
+/// Resolvable reference to a Gateway resource
+/// Use this to reference a gateway's properties in dependent resources
+open class GatewayResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  hidden id: GatewayResolvable = (this) { property = "id" }
+
+  hidden name: GatewayResolvable = (this) { property = "name" }
+
+  hidden region: GatewayResolvable = (this) { property = "region" }
+
+  hidden status: GatewayResolvable = (this) { property = "status" }
+
+  hidden model: GatewayResolvable = (this) { property = "model" }
+
+  hidden externalInformation: GatewayResolvable = (this) { property = "externalInformation" }
+}
+
+/// Subnet configuration for gateway network creation
+@ovh.SubResourceHint
+open class CreateSubnetForGateway extends formae.SubResource {
+  /// CIDR block for the subnet (e.g., "10.0.0.0/24")
+  cidr: String
+
+  /// Enable DHCP for the subnet
+  enableDhcp: Boolean?
+
+  /// IP version (4 or 6)
+  ipVersion: Int?
+}
+
+/// Network configuration for gateway creation
+@ovh.SubResourceHint
+open class CreateNetworkForGateway extends formae.SubResource {
+  /// Network name
+  name: String
+
+  /// VLAN ID (0-4095)
+  vlanId: Int?
+
+  /// Subnet configuration
+  subnet: CreateSubnetForGateway
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class Gateway extends formae.Resource {
+  /// Gateway model size (s, m, l)
+  @ovh.FieldHint {
+    required = true
+  }
+  model: GatewayModel
+
+  /// Gateway name
+  @ovh.FieldHint {
+    required = true
+  }
+  name: String
+
+  /// Network configuration for the gateway
+  /// Required when creating a new gateway with a new network
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  network: CreateNetworkForGateway
+
+  hidden parent = this
+
+  /// Provides resolvable references to this gateway's properties
+  hidden res: GatewayResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}

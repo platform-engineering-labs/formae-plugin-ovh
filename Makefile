@@ -50,6 +50,14 @@ lint:
 clean:
 	rm -rf bin/ dist/
 
+## verify-schema: Verify plugin schema files against PKL spec
+verify-schema:
+	go run github.com/platform-engineering-labs/formae/pkg/plugin/testutil/cmd/verify-schema ./schema/pkl
+
+## schema-docs: Generate documentation for plugin schema in markdown format
+schema-docs:
+	go run github.com/platform-engineering-labs/formae/pkg/plugin/testutil/cmd/schema-docs --format markdown ./schema/pkl
+
 ## install: Build and install plugin locally (binary + schema + manifest)
 ## Installs to ~/.pel/formae/plugins/<namespace>/v<version>/
 ## Removes any existing versions of the plugin first to ensure clean state.

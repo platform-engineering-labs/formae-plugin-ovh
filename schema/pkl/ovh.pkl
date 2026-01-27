@@ -8,7 +8,7 @@ module ovh
 
 import "@formae/formae.pkl"
 
-// OVH Cloud regions
+// OVH Cloud regions (for OpenStack API)
 typealias Region = "BHS5" |  // Beauharnois, Canada
   "DE1" |                     // Frankfurt, Germany
   "GRA7" |                    // Gravelines, France
@@ -18,27 +18,44 @@ typealias Region = "BHS5" |  // Beauharnois, Canada
   "WAW1" |                    // Warsaw, Poland
   "US-EAST-VA-1"              // Virginia, USA
 
+// OVH API endpoints (for DNS and other OVH REST API resources)
+typealias OVHEndpoint = "ovh-eu" |      // Europe
+  "ovh-ca" |                             // Canada
+  "ovh-us" |                             // USA
+  "kimsufi-eu" |                         // Kimsufi Europe
+  "kimsufi-ca" |                         // Kimsufi Canada
+  "soyoustart-eu" |                      // SoYouStart Europe
+  "soyoustart-ca"                        // SoYouStart Canada
+
 /// OVH target configuration
-/// Credentials (username, password, projectID, domainName) are read from
-/// environment variables at runtime and are never stored in the target config.
-/// Required environment variables:
-///   - OS_USERNAME
-///   - OS_PASSWORD
-///   - OS_PROJECT_ID
-///   - OS_USER_DOMAIN_NAME (optional, defaults to "Default")
+/// Fields can be set directly or read from environment variables in resource schemas.
 open class Config {
   hidden fixed type: String = "OVH"
 
-  /// OpenStack Keystone v3 authentication URL (e.g., https://auth.cloud.ovh.us/v3)
-  hidden authURL: String
+  // === OVH REST API fields ===
 
-  /// OVH Cloud region
-  hidden region: Region
+  /// OVH API endpoint for DNS and domain resources
+  hidden ovhEndpoint: (OVHEndpoint|String)?
 
-  // Only non-sensitive fields are exported to the target config
+  /// OVH application key
+  hidden applicationKey: String?
+
+  /// OVH application secret
+  hidden applicationSecret: String?
+
+  /// OVH consumer key
+  hidden consumerKey: String?
+
+  /// Default region for regional resources (e.g., DE1, GRA7, BHS5)
+  hidden region: (Region|String)?
+
+  // Exported fields to target config
   fixed Type: String = type
-  fixed AuthURL: String = authURL
-  fixed Region: Region = region
+  fixed OVHEndpoint: (OVHEndpoint|String)? = ovhEndpoint
+  fixed ApplicationKey: String? = applicationKey
+  fixed ApplicationSecret: String? = applicationSecret
+  fixed ConsumerKey: String? = consumerKey
+  fixed Region: (Region|String)? = region
 }
 
 class FieldHint extends formae.FieldHint {}

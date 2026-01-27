@@ -1,0 +1,67 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// OVH Database - Database within a Service
+/// Creates a database/schema within a managed database service
+/// API: POST /cloud/project/{serviceName}/database/{engine}/{clusterId}/database
+/// Supported engines: PostgreSQL, MySQL (not MongoDB which uses collections)
+module ovh.database.database
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Database::Database"
+
+/// Resolvable reference to a Database
+open class DatabaseResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  hidden id: DatabaseResolvable = (this) { property = "id" }
+
+  hidden name: DatabaseResolvable = (this) { property = "name" }
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class Database extends formae.Resource {
+  hidden parent = this
+
+  /// Cloud project service name
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  serviceName: String
+
+  /// Database engine type (postgresql, mysql)
+  @ovh.FieldHint { required = true; createOnly = true }
+  engine: String
+
+  /// Cluster/Service ID
+  @ovh.FieldHint { required = true; createOnly = true }
+  clusterId: (String|formae.Resolvable)
+
+  /// Database name
+  @ovh.FieldHint { required = true; createOnly = true }
+  name: String
+
+  // === Computed/Output fields ===
+
+  /// Database ID
+  @ovh.FieldHint { persist = false }
+  id: String?
+
+  /// Whether this is the default database
+  @ovh.FieldHint { persist = false }
+  default: Boolean?
+
+  hidden res: DatabaseResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}

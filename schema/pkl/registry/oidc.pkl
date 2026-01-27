@@ -1,0 +1,81 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// OVH Container Registry OIDC Configuration
+/// Configures OIDC authentication for Harbor registry
+/// API: POST /cloud/project/{serviceName}/containerRegistry/{registryId}/openIdConnect
+module ovh.registry.oidc
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Registry::Oidc"
+
+/// Resolvable reference to OIDC configuration
+open class OidcResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  hidden oidcName: OidcResolvable = (this) { property = "oidcName" }
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "oidcName"
+}
+open class Oidc extends formae.Resource {
+  hidden parent = this
+
+  /// Cloud project service name (project ID)
+  @ovh.FieldHint { required = true; createOnly = true }
+  serviceName: String
+
+  /// Registry ID
+  @ovh.FieldHint { required = true; createOnly = true }
+  registryId: (String|formae.Resolvable)
+
+  /// OIDC provider name
+  @ovh.FieldHint { required = true }
+  oidcName: String
+
+  /// OIDC endpoint URL
+  @ovh.FieldHint { required = true }
+  oidcEndpoint: String
+
+  /// OIDC client ID
+  @ovh.FieldHint { required = true }
+  oidcClientId: String
+
+  /// OIDC client secret
+  @ovh.FieldHint { required = true }
+  oidcClientSecret: String
+
+  /// OIDC scope (e.g., "openid,profile,email,offline_access")
+  @ovh.FieldHint { required = true }
+  oidcScope: String
+
+  /// Claim name for groups
+  oidcGroupsClaim: String?
+
+  /// Admin group name
+  oidcAdminGroup: String?
+
+  /// Claim name for username
+  oidcUserClaim: String?
+
+  /// Verify OIDC provider certificate
+  oidcVerifyCert: Boolean?
+
+  /// Auto-onboard users from OIDC
+  oidcAutoOnboard: Boolean?
+
+  /// Delete users when removing OIDC config
+  deleteUsers: Boolean?
+
+  hidden res: OidcResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}

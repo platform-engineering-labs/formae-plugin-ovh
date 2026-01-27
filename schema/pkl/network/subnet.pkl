@@ -32,61 +32,86 @@ open class SubnetResolvable extends formae.Resolvable {
   identifier = "id"
 }
 open class Subnet extends formae.Resource {
-  @ovh.FieldHint {
-    required = false
-  }
-  name: String?
+  // NOTE: Region is read from target config
 
-  @ovh.FieldHint {
-    required = false
-  }
-  description: String?
-
+  /// Parent network ID. The subnet will be created within this network.
   @ovh.FieldHint {
     required = true
     createOnly = true
   }
   network_id: String|formae.Resolvable
 
+  /// Subnet range in CIDR notation (e.g., "10.0.0.0/24").
   @ovh.FieldHint {
     required = true
     createOnly = true
   }
   cidr: String
 
+  /// IP version (4 or 6).
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  ipVersion: Int
+
+  /// Enable DHCP for this subnet.
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  enableDhcp: Boolean
+
+  /// Enable gateway IP for this subnet.
+  /// If true, a gateway will be assigned to the subnet.
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  enableGatewayIp: Boolean
+
+  /// Subnet name.
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  name: String
+
+  /// Specific gateway IP address.
+  /// Only used when enableGatewayIp is true.
   @ovh.FieldHint {
     required = false
     createOnly = true
   }
-  ip_version: Int?
+  gatewayIp: String?
 
-  @ovh.FieldHint {
-    required = false
-  }
-  gateway_ip: String?
-
-  @ovh.FieldHint {
-    required = false
-  }
-  enable_dhcp: Boolean?
-
-  @ovh.FieldHint {
-    required = false
-  }
-  dns_nameservers: Listing<String>?
-
+  /// DNS nameservers for the subnet.
   @ovh.FieldHint {
     required = false
     createOnly = true
   }
-  allocation_pools: Listing<AllocationPool>?
+  dnsNameServers: Listing<String>?
 
+  /// Use default public DNS resolver.
   @ovh.FieldHint {
     required = false
+    createOnly = true
   }
-  tags: Listing<String>?
+  useDefaultPublicDNSResolver: Boolean?
 
-  // id is computed by OpenStack - not user-provided
+  /// IP allocation pools for DHCP.
+  @ovh.FieldHint {
+    required = false
+    createOnly = true
+  }
+  allocationPools: Listing<AllocationPool>?
+
+  /// Host routes for the subnet.
+  @ovh.FieldHint {
+    required = false
+    createOnly = true
+  }
+  hostRoutes: Listing<HostRoute>?
 
   local parent = this
 
@@ -97,8 +122,20 @@ open class Subnet extends formae.Resource {
   }
 }
 
+/// IP allocation pool for DHCP
 @ovh.SubResourceHint
 open class AllocationPool extends formae.SubResource {
+  /// Start IP address of the allocation range
   start: String
+  /// End IP address of the allocation range
   end: String
+}
+
+/// Host route for subnet routing
+@ovh.SubResourceHint
+open class HostRoute extends formae.SubResource {
+  /// Destination CIDR for the route (eg: 192.168.1.0/24)
+  destination: String
+  /// Next hop IP address (eg: 192.168.1.254)
+  nextHop: String
 }

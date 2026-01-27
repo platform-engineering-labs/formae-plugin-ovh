@@ -1,0 +1,98 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module subnetprivate
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Network::SubnetPrivate"
+
+/// Resolvable reference to a SubnetPrivate resource
+/// Use this to reference a subnet's properties in dependent resources
+open class SubnetPrivateResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  /// The subnet's unique identifier
+  hidden id: SubnetPrivateResolvable = (this) {
+    property = "id"
+  }
+
+  /// The subnet's network ID
+  hidden network_id: SubnetPrivateResolvable = (this) {
+    property = "network_id"
+  }
+}
+
+/// Subnet for OVH Private Network
+/// Creates a subnet within a private network using the OVH Cloud API.
+/// Path: POST /cloud/project/{serviceName}/network/private/{networkId}/subnet
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class SubnetPrivate extends formae.Resource {
+  /// Region where this subnet will be created.
+  /// Must be a region where the private network is activated.
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  region: String
+
+  /// Parent network ID. The subnet will be created within this private network.
+  /// Used in URL path: /network/private/{networkId}/subnet
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  network_id: String|formae.Resolvable
+
+  /// Global network with CIDR notation (e.g., "192.168.1.0/24").
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  network: String
+
+  /// Enable DHCP for this subnet.
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  dhcp: Boolean
+
+  /// Set to true if you don't want to set a default gateway IP.
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  noGateway: Boolean
+
+  /// First IP for this region (e.g., "192.168.1.2").
+  /// Defines the start of the DHCP allocation pool.
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  start: String
+
+  /// Last IP for this region (e.g., "192.168.1.254").
+  /// Defines the end of the DHCP allocation pool.
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  end: String
+
+  local parent = this
+
+  /// Provides resolvable references to this subnet's properties
+  hidden res: SubnetPrivateResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}

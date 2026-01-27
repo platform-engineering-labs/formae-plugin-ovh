@@ -1,0 +1,67 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module privatenetwork
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Network::PrivateNetwork"
+
+/// Resolvable reference to a PrivateNetwork resource
+/// Use this to reference a private network's properties in dependent resources
+open class PrivateNetworkResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  /// The network's unique identifier
+  hidden id: PrivateNetworkResolvable = (this) {
+    property = "id"
+  }
+
+  /// The network's name
+  hidden name: PrivateNetworkResolvable = (this) {
+    property = "name"
+  }
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class PrivateNetwork extends formae.Resource {
+  // NOTE: serviceName (OVH Cloud Project ID) is read from target config's projectId field
+
+  /// Network name.
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  name: String
+
+  /// Regions where to activate the private network.
+  /// If not specified, the network is activated in all regions.
+  @ovh.FieldHint {
+    required = false
+    createOnly = true
+  }
+  regions: Listing<String>?
+
+  /// VLAN ID (0-4095).
+  /// 0 means no VLAN.
+  @ovh.FieldHint {
+    required = false
+    createOnly = true
+  }
+  vlanId: Int(isBetween(0, 4095))?
+
+  local parent = this
+
+  /// Provides resolvable references to this private network's properties
+  hidden res: PrivateNetworkResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}

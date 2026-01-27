@@ -1,0 +1,151 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// OVH S3-compatible Object Storage Bucket
+/// API: POST /cloud/project/{serviceName}/region/{regionName}/storage
+module ovh.storage.s3bucket
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Storage::S3Bucket"
+
+/// Versioning status for S3 bucket
+typealias VersioningStatus = "disabled"|"enabled"|"suspended"
+
+/// Encryption algorithm for S3 bucket
+typealias EncryptionAlgorithm = "AES256"|"aws:kms"
+
+/// Resolvable reference to an S3 Bucket
+open class S3BucketResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  hidden name: S3BucketResolvable = (this) { property = "name" }
+
+  hidden region: S3BucketResolvable = (this) { property = "region" }
+
+  hidden createdAt: S3BucketResolvable = (this) { property = "createdAt" }
+
+  hidden objectsCount: S3BucketResolvable = (this) { property = "objectsCount" }
+
+  hidden objectsSize: S3BucketResolvable = (this) { property = "objectsSize" }
+
+  hidden virtualHost: S3BucketResolvable = (this) { property = "virtualHost" }
+
+  hidden ownerId: S3BucketResolvable = (this) { property = "ownerId" }
+}
+
+/// Versioning configuration
+@ovh.SubResourceHint
+open class Versioning extends formae.SubResource {
+  /// Versioning status
+  status: VersioningStatus?
+}
+
+/// Encryption configuration
+@ovh.SubResourceHint
+open class Encryption extends formae.SubResource {
+  /// Server-side encryption algorithm
+  sseAlgorithm: EncryptionAlgorithm?
+}
+
+/// Object lock configuration
+@ovh.SubResourceHint
+open class ObjectLock extends formae.SubResource {
+  /// Object lock mode (GOVERNANCE or COMPLIANCE)
+  mode: String?
+
+  /// Default retention period in days
+  retentionDays: Int?
+
+  /// Default retention period in years
+  retentionYears: Int?
+}
+
+/// Replication rule destination
+@ovh.SubResourceHint
+open class ReplicationDestination extends formae.SubResource {
+  /// Destination bucket name
+  bucket: String?
+
+  /// Destination region
+  region: String?
+
+  /// Storage class for replicated objects
+  storageClass: String?
+}
+
+/// Replication rule
+@ovh.SubResourceHint
+open class ReplicationRule extends formae.SubResource {
+  /// Rule ID
+  id: String?
+
+  /// Rule priority
+  priority: Int?
+
+  /// Rule status (Enabled or Disabled)
+  status: String?
+
+  /// Delete marker replication status
+  deleteMarkerReplication: String?
+
+  /// Object prefix filter
+  prefix: String?
+
+  /// Destination configuration
+  destination: ReplicationDestination?
+}
+
+/// Replication configuration
+@ovh.SubResourceHint
+open class Replication extends formae.SubResource {
+  /// Replication rules
+  rules: Listing<ReplicationRule>?
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "name"
+}
+open class S3Bucket extends formae.Resource {
+  hidden parent = this
+
+  /// Cloud project service name (project ID)
+  @ovh.FieldHint { required = true; createOnly = true }
+  serviceName: String
+
+  /// Region where the bucket is located
+  @ovh.FieldHint { required = true; createOnly = true }
+  region: String
+
+  /// Bucket name (must be globally unique)
+  @ovh.FieldHint { required = true; createOnly = true }
+  name: String
+
+  /// Owner user ID
+  @ovh.FieldHint { createOnly = true }
+  ownerId: Int?
+
+  /// Versioning configuration
+  versioning: Versioning?
+
+  /// Server-side encryption configuration
+  @ovh.FieldHint { createOnly = true }
+  encryption: Encryption?
+
+  /// Object lock configuration (can only be set at creation)
+  @ovh.FieldHint { createOnly = true }
+  objectLock: ObjectLock?
+
+  /// Bucket tags
+  tags: Mapping<String, String>?
+
+  hidden res: S3BucketResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}

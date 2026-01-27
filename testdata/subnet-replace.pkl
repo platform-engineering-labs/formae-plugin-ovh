@@ -5,53 +5,34 @@
  */
 
 amends "@formae/forma.pkl"
-import "@formae/formae.pkl"
-
-import "@ovh/ovh.pkl"
 
 import "@ovh/network/network.pkl"
 import "@ovh/network/subnet.pkl"
 
-local stackName = "plugin-sdk-test-stack"
-// Read the test run ID from environment variable set by the test harness
-// This ensures consistent naming within a test run but unique names between runs
-local testRunID = read("env:FORMAE_TEST_RUN_ID")
+import "./vars.pkl" as v
 
 forma {
-  new formae.Stack {
-    label = stackName
-    description = "Plugin SDK test for OVH Subnet - Replace"
-  }
+  v.stack
+  v.target
 
-  new formae.Target {
-    label = "ovh-target"
-    config = new ovh.Config {
-      authURL = "https://auth.cloud.ovh.us/v3"
-      region = "US-EAST-VA-1"
-      // username, password, projectID, domainName will be read from environment variables:
-      // OS_USERNAME, OS_PASSWORD, OS_PROJECT_ID, OS_USER_DOMAIN_NAME
-    }
-  }
-
-  // Define the network that this subnet belongs to (same as in subnet.pkl)
-  local testNetwork = new network.Network {
+  // Define the private network that this subnet belongs to
+  // Must specify region to ensure it's activated before subnet creation
+  local testNetwork = new network.NetworkResolvable{
     label = "plugin-sdk-test-network"
-    name = "formae-plugin-sdk-test-network-\(testRunID)"
-    description = "Test network for subnet plugin SDK tests"
-    admin_state_up = true
+    stack = v.stack.Label
   }
   testNetwork
 
   // Replace the subnet - change CreateOnly property (cidr)
   new subnet.Subnet {
     label = "plugin-sdk-test-subnet"
-    name = "formae-plugin-sdk-test-subnet-\(testRunID)-replaced"
-    network_id = testNetwork.res.id
+    name = "formae-plugin-sdk-test-subnet-\(v.testRunID)-replaced"
+    network_id = testNetwork.id
     cidr = "10.0.4.0/24"  // Changed CIDR - requires replacement
-    ip_version = 4
-    gateway_ip = "10.0.4.1"
-    enable_dhcp = true
-    dns_nameservers {
+    ipVersion = 4
+    enableDhcp = true
+    enableGatewayIp = true
+    dnsNameServers {
       "8.8.8.8"
       "8.8.4.4"
     }

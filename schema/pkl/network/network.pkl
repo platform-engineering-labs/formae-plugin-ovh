@@ -11,6 +11,9 @@ import "../ovh.pkl"
 
 const type = "OVH::Network::Network"
 
+/// Gateway model sizes available in OVH
+typealias GatewayModel = "s"|"m"|"l"|"xl"|"2xl"|"3xl"
+
 /// Resolvable reference to a Network resource
 /// Use this to reference a network's properties in dependent resources
 open class NetworkResolvable extends formae.Resolvable {
@@ -32,39 +35,29 @@ open class NetworkResolvable extends formae.Resolvable {
   identifier = "id"
 }
 open class Network extends formae.Resource {
-  @ovh.FieldHint {
-    required = false
-  }
-  name: String?
+  // NOTE: serviceName (OVH Cloud Project ID) and region are read from target config
 
+  /// Network name.
   @ovh.FieldHint {
-    required = false
+    required = true
+    createOnly = true
   }
-  description: String?
+  name: String
 
+  /// Subnet configuration (required for network creation).
   @ovh.FieldHint {
-    required = false
+    required = true
+    createOnly = true
   }
-  admin_state_up: Boolean?
+  subnet: SubnetConfig
 
+  /// Gateway configuration (optional).
+  /// Creates a gateway attached to this network.
   @ovh.FieldHint {
     required = false
     createOnly = true
   }
-  shared: Boolean?
-
-  @ovh.FieldHint {
-    required = false
-    createOnly = true
-  }
-  mtu: Int?
-
-  @ovh.FieldHint {
-    required = false
-  }
-  tags: Listing<String>? = new Listing {}
-
-  // id is computed by OpenStack - not user-provided
+  gateway: GatewayConfig?
 
   local parent = this
 
@@ -73,4 +66,76 @@ open class Network extends formae.Resource {
     label = parent.label
     stack = parent.stack?.label
   }
+}
+
+/// Subnet configuration for network creation.
+/// All fields are createOnly since OVH networks don't support PUT/PATCH.
+@ovh.SubResourceHint
+open class SubnetConfig extends formae.SubResource {
+  /// Subnet range in CIDR notation (e.g., "10.0.0.0/24"). Required.
+  cidr: String
+
+  /// IP version (4 or 6). Required.
+  ipVersion: Int
+
+  /// Enable DHCP for the subnet. Required.
+  enableDhcp: Boolean
+
+  /// Enable gateway IP for this subnet. Required.
+  /// If true, a gateway IP will be assigned.
+  enableGatewayIp: Boolean
+
+  /// Optional subnet name.
+  name: String?
+
+  /// Specific gateway IP address.
+  /// Only used when enableGatewayIp is true.
+  gatewayIp: String?
+
+  /// DNS nameservers for the subnet.
+  dnsNameServers: Listing<String>?
+
+  /// Use default public DNS resolver.
+  useDefaultPublicDNSResolver: Boolean?
+
+  /// IP allocation pools for DHCP.
+  allocationPools: Listing<AllocationPool>?
+
+  /// Host routes for the subnet.
+  hostRoutes: Listing<HostRoute>?
+
+  /// VLAN ID (1-4095).
+  vlanId: Int(isBetween(1, 4095))?
+}
+
+/// Gateway configuration for network creation.
+/// All fields are createOnly since OVH networks don't support PUT/PATCH.
+@ovh.SubResourceHint
+open class GatewayConfig extends formae.SubResource {
+  /// Gateway model/size. Required.
+  /// Available: s, m, l, xl, 2xl, 3xl
+  model: GatewayModel
+
+  /// Gateway name. Required.
+  name: String
+}
+
+/// IP allocation pool for DHCP.
+@ovh.SubResourceHint
+open class AllocationPool extends formae.SubResource {
+  /// Start IP address of the allocation range.
+  start: String
+
+  /// End IP address of the allocation range.
+  end: String
+}
+
+/// Host route for subnet routing.
+@ovh.SubResourceHint
+open class HostRoute extends formae.SubResource {
+  /// Destination CIDR for the route (eg: 192.168.1.0/24).
+  destination: String
+
+  /// Next hop IP address (eg: 192.168.1.254).
+  nextHop: String
 }

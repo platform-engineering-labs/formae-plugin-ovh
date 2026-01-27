@@ -1,0 +1,95 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// OVH SWIFT Object Storage Container
+/// API: POST /cloud/project/{serviceName}/storage
+module ovh.storage.container
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Storage::Container"
+
+/// Resolvable reference to a Container resource
+/// Use this to reference a container's properties in dependent resources
+open class ContainerResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  hidden id: ContainerResolvable = (this) { property = "id" }
+
+  hidden containerName: ContainerResolvable = (this) { property = "containerName" }
+
+  hidden region: ContainerResolvable = (this) { property = "region" }
+
+  hidden storedObjects: ContainerResolvable = (this) { property = "storedObjects" }
+
+  hidden storedBytes: ContainerResolvable = (this) { property = "storedBytes" }
+
+  hidden containerType: ContainerResolvable = (this) { property = "containerType" }
+
+  hidden archive: ContainerResolvable = (this) { property = "archive" }
+
+  hidden staticUrl: ContainerResolvable = (this) { property = "staticUrl" }
+
+  hidden publicUrl: ContainerResolvable = (this) { property = "publicUrl" }
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class Container extends formae.Resource {
+  /// Container name
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  containerName: String
+
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  region: String
+
+  /// Whether this is an archive container
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  archive: Boolean
+
+  /// Container type (private, public, static) - the only updatable field
+  containerType: ("private"|"public"|"static")?
+
+  /// Container ID (assigned by OVH)
+  @ovh.FieldHint { persist = false }
+  id: String?
+
+  /// Total objects stored
+  @ovh.FieldHint { persist = false }
+  storedObjects: Int?
+
+  /// Total bytes stored
+  @ovh.FieldHint { persist = false }
+  storedBytes: Int?
+
+  /// Static URL for public access
+  @ovh.FieldHint { persist = false }
+  staticUrl: String?
+
+  /// Public URL
+  @ovh.FieldHint { persist = false }
+  publicUrl: String?
+
+  hidden parent = this
+
+  /// Provides resolvable references to this container's properties
+  hidden res: ContainerResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}

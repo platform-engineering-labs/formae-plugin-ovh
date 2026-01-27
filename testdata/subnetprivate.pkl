@@ -1,0 +1,40 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@ovh/network/privatenetwork.pkl"
+import "@ovh/network/subnetprivate.pkl"
+
+import "./vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  // Define the private network that this subnet belongs to
+  // Must specify region to ensure it's activated before subnet creation
+  local testNetwork = new privatenetwork.PrivateNetwork {
+    label = "plugin-sdk-test-network"
+    name = "formae-plugin-sdk-test-network-\(v.testRunID)"
+    regions {
+      v.region
+    }
+  }
+  testNetwork
+
+  // Create the subnet using OVH API field names directly
+  new subnetprivate.SubnetPrivate {
+    label = "plugin-sdk-test-subnet"
+    region = v.region
+    network_id = testNetwork.res.id
+    network = "10.0.3.0/24"
+    dhcp = true
+    noGateway = false
+    start = "10.0.3.2"
+    end = "10.0.3.254"
+  }
+}
