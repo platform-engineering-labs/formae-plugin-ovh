@@ -1,4 +1,4 @@
-# OVH Cloud Plugin for Formae
+# OVH Cloud Plugin for formae
 
 [![CI](https://github.com/platform-engineering-labs/formae-plugin-ovh/actions/workflows/ci.yml/badge.svg)](https://github.com/platform-engineering-labs/formae-plugin-ovh/actions/workflows/ci.yml)
 
