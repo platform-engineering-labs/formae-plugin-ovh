@@ -4,9 +4,10 @@ go 1.25
 
 require (
 	github.com/gophercloud/gophercloud/v2 v2.10.0
+	github.com/ovh/go-ovh v1.9.0
 	github.com/platform-engineering-labs/formae/pkg/model v0.1.1
-	github.com/platform-engineering-labs/formae/pkg/plugin v0.1.4
-	github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.1.6
+	github.com/platform-engineering-labs/formae/pkg/plugin v0.1.3-0.20260126122350-41f0eaad79ba
+	github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.1.5
 	github.com/stretchr/testify v1.11.1
 )
 
@@ -41,11 +42,13 @@ require (
 	go.opentelemetry.io/otel/trace v1.39.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.9.0 // indirect
 	golang.org/x/net v0.47.0 // indirect
+	golang.org/x/oauth2 v0.32.0 // indirect
 	golang.org/x/sys v0.39.0 // indirect
 	golang.org/x/text v0.31.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20251202230838-ff82c1b0f217 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251202230838-ff82c1b0f217 // indirect
 	google.golang.org/grpc v1.77.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
+	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

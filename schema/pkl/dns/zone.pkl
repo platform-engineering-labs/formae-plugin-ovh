@@ -1,0 +1,36 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module zone
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::DNS::Zone"
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "name"
+}
+open class Zone extends formae.Resource {
+  /// Zone name (e.g., "example.com")
+  @ovh.FieldHint {
+    required = true
+  }
+  name: String
+
+  /// Whether DNSSEC is enabled
+  @ovh.FieldHint { persist = false }
+  dnssecSupported: Boolean?
+
+  /// Last update timestamp
+  @ovh.FieldHint { persist = false }
+  lastUpdate: String?
+
+  /// Name servers for this zone
+  @ovh.FieldHint { persist = false }
+  nameServers: Listing<String>?
+}

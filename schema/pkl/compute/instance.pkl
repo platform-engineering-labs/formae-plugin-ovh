@@ -11,60 +11,161 @@ import "../ovh.pkl"
 
 const type = "OVH::Compute::Instance"
 
+/// Resolvable reference to an Instance resource
+/// Use this to reference an instance's properties in dependent resources
+open class InstanceResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  /// The instance's unique identifier
+  hidden id: InstanceResolvable = (this) {
+    property = "id"
+  }
+
+  /// The instance's name
+  hidden name: InstanceResolvable = (this) {
+    property = "name"
+  }
+
+  /// The instance's network interfaces [{networkId, ip}, ...]
+  /// Populated from the instance interface API response
+  hidden networks: InstanceResolvable = (this) {
+    property = "networks"
+  }
+
+  /// The instance's first private network IP (convenience field)
+  /// Use this for floating IP association
+  hidden privateIp: InstanceResolvable = (this) {
+    property = "privateIp"
+  }
+}
+
+/// OVH Cloud Compute Instance
+/// Create: POST /cloud/project/{serviceName}/instance
+/// Read: GET /cloud/project/{serviceName}/instance/{instanceId}
+/// Update: PUT /cloud/project/{serviceName}/instance/{instanceId}
+/// Delete: DELETE /cloud/project/{serviceName}/instance/{instanceId}
 @ovh.ResourceHint {
   type = module.type
   identifier = "id"
 }
 open class Instance extends formae.Resource {
+  // ========== Create Input Properties (cloud.ProjectInstanceCreation) ==========
+
+  /// Instance name
   @ovh.FieldHint {
     required = true
   }
   name: String
 
+  /// Instance flavor id
   @ovh.FieldHint {
     required = true
     createOnly = true
   }
-  flavor_id: String
+  flavorId: String
 
+  /// Instance region (e.g., "DE1", "GRA7", "BHS5")
   @ovh.FieldHint {
     required = true
     createOnly = true
   }
-  image_id: String
+  region: String
 
+  /// Instance image id (optional if using volumeId to boot from volume)
   @ovh.FieldHint {
     createOnly = true
   }
-  networks: Listing<NetworkAttachment>?
+  imageId: String?
 
-  security_groups: Listing<String>?
-
+  /// Network interfaces to create
   @ovh.FieldHint {
     createOnly = true
   }
-  key_name: String?
+  networks: Listing<NetworkParams>?
 
+  /// SSH keypair id
   @ovh.FieldHint {
     createOnly = true
   }
-  user_data: String?
+  sshKeyId: String?
 
+  /// Configuration information or scripts to use upon launch (cloud-init)
   @ovh.FieldHint {
     createOnly = true
   }
-  availability_zone: String?
+  userData: String?
 
-  metadata: Mapping<String, String>?
+  /// Availability zone to create the instance on
+  @ovh.FieldHint {
+    createOnly = true
+  }
+  availabilityZone: String?
 
-  // Computed fields (not user-provided)
-  // id: String
-  // status: String
+  /// Start instance in group
+  @ovh.FieldHint {
+    createOnly = true
+  }
+  groupId: String?
+
+  /// Activate monthly billing
+  @ovh.FieldHint {
+    createOnly = true
+  }
+  monthlyBilling: Boolean?
+
+  /// Specify a volume id to boot from it
+  @ovh.FieldHint {
+    createOnly = true
+  }
+  volumeId: String?
+
+  /// Create an autobackup workflow after instance start up
+  @ovh.FieldHint {
+    createOnly = true
+  }
+  autobackup: AutoBackup?
+
+  // ========== Read-Only Response Properties (cloud.instance.Instance) ==========
+  // These are computed by the API and returned in ReadOnlyProperties:
+  // - id: String - Instance unique identifier
+  // - status: String - Instance status (BUILD, ACTIVE, ERROR, etc.)
+  // - created: DateTime - Instance creation date
+  // - ipAddresses: IpAddress[] - Instance IP addresses
+  // - currentMonthOutgoingTraffic: Long? - Outgoing traffic in bytes
+  // - monthlyBilling: MonthlyBilling? - Monthly billing status
+  // - operationIds: String[] - Pending public cloud operation IDs
+  // - planCode: String? - Order plan code
+  // - flavor: Flavor - Full flavor details (expanded from flavorId)
+  // - image: Image - Full image details (expanded from imageId)
+  // - sshKey: SshKey? - SSH key details (expanded from sshKeyId)
+
+  local parent = this
+
+  /// Provides resolvable references to this instance's properties
+  hidden res: InstanceResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
 }
 
+/// Network parameters for instance creation
+/// Maps to cloud.instance.NetworkParams
 @ovh.SubResourceHint
-open class NetworkAttachment extends formae.SubResource {
-  uuid: (String|formae.Resolvable)?
-  port: (String|formae.Resolvable)?
-  fixed_ip: String?
+open class NetworkParams extends formae.SubResource {
+  /// Private or public network ID
+  networkId: (String|formae.Resolvable)?
+
+  /// Static IP address (can only be defined for private networks)
+  ip: String?
+}
+
+/// Autobackup configuration for instance creation
+/// Maps to cloud.instance.AutoBackup
+@ovh.SubResourceHint
+open class AutoBackup extends formae.SubResource {
+  /// Unix cron pattern for backup schedule
+  cron: String?
+
+  /// Number of backup to keep
+  rotation: Int?
 }

@@ -6,13 +6,13 @@
 
 /// OVH Cloud plugin manifest for Formae.
 /// This plugin provides resource management for OVH Public Cloud infrastructure
-/// using the OpenStack APIs.
+/// using the ovh cloud API & OpenStack APIs.
 
 name = "ovh"
 version = "0.1.0"
 namespace = "ovh"
 license = "Apache-2.0"
-minFormaeVersion = "0.76.0"
+minFormaeVersion = "0.77.14-internal"
 
 output {
   renderer = new JsonRenderer {}

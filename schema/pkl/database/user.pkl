@@ -1,0 +1,126 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// OVH Database User
+/// API: POST /cloud/project/{serviceName}/database/{engine}/{clusterId}/user
+module ovh.database.user
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Database::User"
+
+/// User status
+typealias UserStatus = "CREATING"|"READY"|"PENDING"|"ERROR"|"DELETING"
+
+/// Resolvable reference to a Database User
+open class UserResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  hidden id: UserResolvable = (this) { property = "id" }
+
+  hidden username: UserResolvable = (this) { property = "username" }
+
+  hidden password: UserResolvable = (this) { property = "password" }
+}
+
+/// PostgreSQL/MongoDB user role
+@ovh.SubResourceHint
+open class Role extends formae.SubResource {
+  /// Role name
+  name: String
+
+  /// Database the role applies to (for MongoDB)
+  database: String?
+}
+
+/// Redis user ACL configuration
+@ovh.SubResourceHint
+open class RedisAcl extends formae.SubResource {
+  /// Allowed categories
+  categories: Listing<String>?
+
+  /// Allowed channels
+  channels: Listing<String>?
+
+  /// Allowed commands
+  commands: Listing<String>?
+
+  /// Allowed keys patterns
+  keys: Listing<String>?
+}
+
+/// OpenSearch user ACL
+@ovh.SubResourceHint
+open class OpensearchAcl extends formae.SubResource {
+  /// ACL pattern
+  pattern: String
+
+  /// ACL permission
+  permission: String
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class User extends formae.Resource {
+  hidden parent = this
+
+  /// Cloud project service name
+  @ovh.FieldHint { required = true; createOnly = true }
+  serviceName: String
+
+  /// Database engine type
+  @ovh.FieldHint { required = true; createOnly = true }
+  engine: String
+
+  /// Cluster/Service ID
+  @ovh.FieldHint { required = true; createOnly = true }
+  clusterId: (String|formae.Resolvable)
+
+  /// Username
+  @ovh.FieldHint { required = true; createOnly = true }
+  name: String
+
+  // === Engine-specific options ===
+
+  /// User roles (PostgreSQL, MongoDB)
+  roles: Listing<Role>?
+
+  /// Redis ACL configuration (Redis only)
+  redisAcl: RedisAcl?
+
+  /// OpenSearch ACLs (OpenSearch only)
+  opensearchAcls: Listing<OpensearchAcl>?
+
+  // === Computed/Output fields ===
+
+  /// User ID
+  @ovh.FieldHint { persist = false }
+  id: String?
+
+  /// Username (same as name, returned by API)
+  @ovh.FieldHint { persist = false }
+  username: String?
+
+  /// Generated password (only returned on creation)
+  @ovh.FieldHint { persist = false }
+  password: String?
+
+  /// Creation timestamp
+  @ovh.FieldHint { persist = false }
+  createdAt: String?
+
+  /// User status
+  @ovh.FieldHint { persist = false }
+  status: UserStatus?
+
+  hidden res: UserResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}

@@ -22,7 +22,7 @@ BINARY := $(PLUGIN_NAME)
 PLUGIN_BASE_DIR := $(HOME)/.pel/formae/plugins
 INSTALL_DIR := $(PLUGIN_BASE_DIR)/$(PLUGIN_NAMESPACE)/v$(PLUGIN_VERSION)
 
-.PHONY: all build test test-unit test-integration lint verify-schema clean install help setup-credentials clean-environment conformance-test conformance-test-crud conformance-test-discovery
+.PHONY: all build test test-unit test-integration lint clean install help setup-credentials clean-environment conformance-test conformance-test-crud conformance-test-discovery
 
 all: build
 
@@ -46,14 +46,17 @@ test-integration:
 lint:
 	golangci-lint run
 
-## verify-schema: Validate PKL schema files
-## Checks that schema files are well-formed and follow formae conventions.
-verify-schema:
-	$(GO) run github.com/platform-engineering-labs/formae/pkg/plugin/testutil/cmd/verify-schema --namespace $(PLUGIN_NAMESPACE) ./schema/pkl
-
 ## clean: Remove build artifacts
 clean:
 	rm -rf bin/ dist/
+
+## verify-schema: Verify plugin schema files against PKL spec
+verify-schema:
+	go run github.com/platform-engineering-labs/formae/pkg/plugin/testutil/cmd/verify-schema ./schema/pkl
+
+## schema-docs: Generate documentation for plugin schema in markdown format
+schema-docs:
+	go run github.com/platform-engineering-labs/formae/pkg/plugin/testutil/cmd/schema-docs --format markdown ./schema/pkl
 
 ## install: Build and install plugin locally (binary + schema + manifest)
 ## Installs to ~/.pel/formae/plugins/<namespace>/v<version>/

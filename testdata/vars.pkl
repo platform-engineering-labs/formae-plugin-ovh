@@ -1,0 +1,47 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+import "@formae/formae.pkl"
+import "@ovh/ovh.pkl"
+
+// Common test configuration
+stackName = "plugin-sdk-test-stack"
+
+// Read the test run ID from environment variable set by the test harness
+// This ensures consistent naming within a test run but unique names between runs
+testRunID = read("env:FORMAE_TEST_RUN_ID")
+
+// Default region for OVH resources (used by privatenetwork, subnet, etc.)
+region = read?("env:OS_REGION_NAME") ?? "DE1"
+
+// OVH-provided resource IDs (these are pre-existing in the OVH environment)
+// Ext-Net is the public network provided by OVH for external connectivity
+extNetID = "b347ed75-8603-4ce0-a40c-c6c98a8820fc"
+
+// Ubuntu 24.04 image provided by OVH
+ubuntuImageID = "720fbd6e-6edb-4983-bfc6-dfc22ab23656"
+
+// s1-2 flavor (2GB RAM, 1 vCPU)
+flavorID = "3be7c73a-735a-4ee1-b8d4-83feb080109d"
+
+// d2-2 flavor (2GB RAM, 1 vCPU, larger disk) - different from s1-2 to force replacement
+replacementFlavorID = "91ca682c-3d92-4a8d-afde-a88d00b7f21e"
+
+// Common stack definition
+stack = new formae.Stack {
+  label = stackName
+  description = "Plugin SDK test for OVH"
+}
+
+// Common target definition with OVH REST API credentials
+target = new formae.Target {
+  label = "ovh-target"
+  config = new ovh.Config {
+    // OVH REST API credentials
+    ovhEndpoint = read?("env:OVH_ENDPOINT") ?? "ovh-eu"
+    region = read?("env:OS_REGION_NAME") ?? "DE1"
+  }
+}

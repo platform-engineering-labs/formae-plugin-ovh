@@ -5,58 +5,58 @@
 package testutil
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"os"
+	"testing"
+	"time"
 
-	"github.com/platform-engineering-labs/formae-plugin-ovh/pkg/config"
+	ovhtransport "github.com/platform-engineering-labs/formae-plugin-ovh/pkg/transport/ovh"
+	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
+	"github.com/stretchr/testify/require"
 )
 
 var (
-	// OVH OpenStack configuration - read from environment variables
-	// Source your OpenStack credentials file before running tests:
-	//   source ~/.ovh-openstack-credentials
+	// OVH REST API configuration - read from environment variables
+	OVHEndpoint          = getEnvOrDefault("OVH_ENDPOINT", "ovh-eu")
+	OVHApplicationKey    = os.Getenv("OVH_APPLICATION_KEY")
+	OVHApplicationSecret = os.Getenv("OVH_APPLICATION_SECRET")
+	OVHConsumerKey       = os.Getenv("OVH_CONSUMER_KEY")
+	OVHCloudProjectID    = os.Getenv("OVH_CLOUD_PROJECT_ID")
 
-	AuthURL    = getEnvOrDefault("OS_AUTH_URL", "https://auth.cloud.ovh.net/v3")
-	Username   = os.Getenv("OS_USERNAME")
-	Password   = os.Getenv("OS_PASSWORD")
-	ProjectID  = os.Getenv("OS_PROJECT_ID")
-	Region     = getEnvOrDefault("OS_REGION_NAME", "DE1")
-	DomainName = getEnvOrDefault("OS_USER_DOMAIN_NAME", "Default")
-
-	// External network ID for floating IPs (OVH Ext-Net)
-	// Can be overridden via OS_EXTERNAL_NETWORK_ID environment variable
-	//ExternalNetworkID = getEnvOrDefault("OS_EXTERNAL_NETWORK_ID", "b347ed75-8603-4ce0-a40c-c6c98a8820fc") //TODO renable once REGION is fixed
-	ExternalNetworkID = getEnvOrDefault("OS_EXTERNAL_NETWORK_ID", "ed0ab0c6-93ee-44f8-870b-d103065b1b34")
-
-	// Compute test configuration
-	// Override via environment variables if needed
-	// TestFlavorID - Small flavor for testing (OVH d2-2: 2 vCPU, 2GB RAM)
-	TestFlavorID = getEnvOrDefault("OS_TEST_FLAVOR_ID", "45ca263c-0373-4902-ab39-e5f0fc118190") // openstack flavor list --limit 20 2>&1 | head -30
-	// TestImageID - Image for testing (set via OS_TEST_IMAGE_ID, no default as it varies by region)
-	TestImageID = getEnvOrDefault("OS_TEST_IMAGE_ID", "6e9dbad6-03bb-49ee-a992-99e852f05381") // openstack image list --limit 10
-	// TestNetworkID - Private network for instance testing (optional)
-	TestNetworkID = getEnvOrDefault("OS_TEST_NETWORK_ID", "63dc373f-aaa9-4447-a4cd-5f6f28c2e7d7") // openstack network list --internal
-	// TestSSHPublicKey - SSH public key for keypair testing (valid RSA 2048-bit key)
-	TestSSHPublicKey = getEnvOrDefault("OS_TEST_SSH_PUBLIC_KEY", "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCp/ZSLK1ks5D52nW/5iTsf6xWz1DOu94JB2C2KdN4earhMw4ej+HxANayQKD67pgSub0SnSH14/HxnnfnQ4g8r+o5KVZtZyBF7bJSc0qSyRYlQBWRWKUUlNFLFA5WQBRZyN+fBQvb+/9ndrFjPOiNcPjWI8EnF70dd4LGAIFuca+apsdeN125S9FaLZR3mKdrj8cp2nEMQvPUytqx6e3lZN0WhQ6ChztdijzUGdzi9ck/0spKwY1bMYgXmj1pWi3YDDnghc9a+MOdTGELVXhBou7qM5IxRdOR5T2BuHLgDipM+bKR4czEghKPNuOC8t+U+q/LShgkE/pFQg+pukp6z formae-integration-test")
-
-	Config = &config.Config{
-		AuthURL:    AuthURL,
-		Region:     Region,
-		Username:   Username,
-		Password:   Password,
-		ProjectID:  ProjectID,
-		DomainName: DomainName,
+	// OVHConfig returns the OVH REST API client configuration
+	OVHConfig = &ovhtransport.OVHConfig{
+		Endpoint:          OVHEndpoint,
+		ApplicationKey:    OVHApplicationKey,
+		ApplicationSecret: OVHApplicationSecret,
+		ConsumerKey:       OVHConsumerKey,
 	}
 
-	// TargetConfig is a json.RawMessage containing the target configuration
-	// Note: Only AuthURL and Region are stored in target config (credentials come from env)
-	TargetConfig = func() json.RawMessage {
-		b, _ := json.Marshal(map[string]interface{}{
-			"authURL": AuthURL,
-			"region":  Region,
-		})
-		return b
-	}()
+	// Region for testing (e.g., DE1, GRA9, UK1, BHS5)
+	// Note: GRA11 only has GPU flavors - use DE1/GRA9 for standard compute
+	Region = getEnvOrDefault("OS_REGION_NAME", "DE1")
+
+	// Compute test configuration for DE1 region
+	// TestFlavorID - Small flavor for testing (OVH b2-7: 2 vCPU, 7GB RAM)
+	TestFlavorID = getEnvOrDefault("OS_TEST_FLAVOR_ID", "3be7c73a-735a-4ee1-b8d4-83feb080109d") // b2-7 in DE1
+	// TestImageID - Image for testing (AlmaLinux 9)
+	TestImageID = getEnvOrDefault("OS_TEST_IMAGE_ID", "720fbd6e-6edb-4983-bfc6-dfc22ab23656") // AlmaLinux 9 in DE1
+
+	// Database cluster test configuration (for nested resources that need an existing cluster)
+	// Set these environment variables with an existing database cluster for testing
+	// Get cluster IDs from: GET /cloud/project/{serviceName}/database/{engine}
+	TestDatabaseEngine    = getEnvOrDefault("OVH_TEST_DATABASE_ENGINE", "")    // e.g., "mysql", "postgresql"
+	TestDatabaseClusterID = getEnvOrDefault("OVH_TEST_DATABASE_CLUSTER_ID", "") // cluster UUID
+
+	// Database service creation test configuration
+	// These are used when creating new database services in tests
+	// Run TestService_ListCapabilities_Integration to see available options for your region
+	TestDBServiceEngine  = getEnvOrDefault("OVH_TEST_DB_SERVICE_ENGINE", "mysql")     // Engine to test
+	TestDBServiceVersion = getEnvOrDefault("OVH_TEST_DB_SERVICE_VERSION", "8")        // Engine version
+	TestDBServicePlan    = getEnvOrDefault("OVH_TEST_DB_SERVICE_PLAN", "essential")   // Plan tier
+	TestDBServiceFlavor  = getEnvOrDefault("OVH_TEST_DB_SERVICE_FLAVOR", "db1-4")     // Smallest flavor
+	TestDBServiceRegion  = getEnvOrDefault("OVH_TEST_DB_SERVICE_REGION", "DE")        // Region for nodes
 )
 
 // getEnvOrDefault returns the environment variable value or the default if not set
@@ -67,14 +67,317 @@ func getEnvOrDefault(key, defaultValue string) string {
 	return defaultValue
 }
 
-// IsConfigured returns true if the required environment variables are set
-func IsConfigured() bool {
-	return Username != "" && Password != "" && ProjectID != ""
+// IsOVHConfigured returns true if the required OVH REST API environment variables are set
+func IsOVHConfigured() bool {
+	return OVHApplicationKey != "" && OVHApplicationSecret != "" && OVHConsumerKey != "" && OVHCloudProjectID != ""
 }
 
-// SkipIfNotConfigured skips the test if required environment variables are not set
-func SkipIfNotConfigured(t interface{ Skip(...any) }) {
-	if !IsConfigured() {
-		t.Skip("Skipping test: OVH credentials not configured. Set OS_USERNAME, OS_PASSWORD, and OS_PROJECT_ID environment variables.")
+// SkipIfOVHNotConfigured skips the test if required OVH REST API environment variables are not set
+func SkipIfOVHNotConfigured(t interface{ Skip(...any) }) {
+	if !IsOVHConfigured() {
+		t.Skip("Skipping test: OVH REST API credentials not configured. Set OVH_APPLICATION_KEY, OVH_APPLICATION_SECRET, OVH_CONSUMER_KEY, and OVH_CLOUD_PROJECT_ID environment variables.")
 	}
+}
+
+// IsDatabaseConfigured returns true if database cluster test configuration is set
+func IsDatabaseConfigured() bool {
+	return IsOVHConfigured() && TestDatabaseEngine != "" && TestDatabaseClusterID != ""
+}
+
+// SkipIfDatabaseNotConfigured skips the test if database cluster configuration is not set
+func SkipIfDatabaseNotConfigured(t interface{ Skip(...any) }) {
+	if !IsDatabaseConfigured() {
+		t.Skip("Skipping test: Database cluster not configured. Set OVH_TEST_DATABASE_ENGINE and OVH_TEST_DATABASE_CLUSTER_ID environment variables.")
+	}
+}
+
+// NewOVHClient creates a new OVH REST API client from environment configuration
+func NewOVHClient() (*ovhtransport.Client, error) {
+	return ovhtransport.NewClient(OVHConfig)
+}
+
+// StatusChecker defines the interface for checking operation status
+type StatusChecker interface {
+	Status(ctx context.Context, request *resource.StatusRequest) (*resource.StatusResult, error)
+}
+
+// PollConfig configures the polling behavior
+type PollConfig struct {
+	MaxAttempts   int
+	CheckInterval time.Duration
+	ResourceType  string
+	OperationName string // "Create", "Delete", "Update" for better logging
+}
+
+// DefaultPollConfig returns sensible defaults for polling
+func DefaultPollConfig() PollConfig {
+	return PollConfig{
+		MaxAttempts:   100,
+		CheckInterval: 5 * time.Second,
+		OperationName: "Operation",
+	}
+}
+
+// PollConfigBuilder provides a fluent API for building PollConfig
+type PollConfigBuilder struct {
+	config PollConfig
+}
+
+// NewPollConfig creates a new PollConfigBuilder with defaults
+func NewPollConfig() *PollConfigBuilder {
+	return &PollConfigBuilder{
+		config: DefaultPollConfig(),
+	}
+}
+
+// WithMaxAttempts sets the maximum number of polling attempts
+func (b *PollConfigBuilder) WithMaxAttempts(attempts int) *PollConfigBuilder {
+	b.config.MaxAttempts = attempts
+	return b
+}
+
+// WithCheckInterval sets the interval between polling attempts
+func (b *PollConfigBuilder) WithCheckInterval(interval time.Duration) *PollConfigBuilder {
+	b.config.CheckInterval = interval
+	return b
+}
+
+// WithResourceType sets the resource type
+func (b *PollConfigBuilder) WithResourceType(resourceType string) *PollConfigBuilder {
+	b.config.ResourceType = resourceType
+	return b
+}
+
+// WithOperationName sets the operation name for logging
+func (b *PollConfigBuilder) WithOperationName(name string) *PollConfigBuilder {
+	b.config.OperationName = name
+	return b
+}
+
+// ForCreate configures for a create operation (default settings)
+func (b *PollConfigBuilder) ForCreate() *PollConfigBuilder {
+	b.config.OperationName = "Create"
+	return b
+}
+
+// ForDelete configures for a delete operation (default settings)
+func (b *PollConfigBuilder) ForDelete() *PollConfigBuilder {
+	b.config.OperationName = "Delete"
+	return b
+}
+
+// ForUpdate configures for an update operation (default settings)
+func (b *PollConfigBuilder) ForUpdate() *PollConfigBuilder {
+	b.config.OperationName = "Update"
+	return b
+}
+
+// ForLongRunningCreate configures for long-running create operations (e.g., instances)
+func (b *PollConfigBuilder) ForLongRunningCreate() *PollConfigBuilder {
+	b.config.OperationName = "Create"
+	b.config.MaxAttempts = 200 // ~20 minutes with 6s intervals
+	b.config.CheckInterval = 6 * time.Second
+	return b
+}
+
+// ForLongRunningDelete configures for long-running delete operations
+func (b *PollConfigBuilder) ForLongRunningDelete() *PollConfigBuilder {
+	b.config.OperationName = "Delete"
+	b.config.MaxAttempts = 200 // ~20 minutes with 6s intervals
+	b.config.CheckInterval = 6 * time.Second
+	return b
+}
+
+// Build returns the final PollConfig
+func (b *PollConfigBuilder) Build() PollConfig {
+	return b.config
+}
+
+// PollUntilComplete polls the status until the operation completes or times out
+func PollUntilComplete(
+	t *testing.T,
+	ctx context.Context,
+	checker StatusChecker,
+	nativeID string,
+	targetConfig json.RawMessage,
+	config PollConfig,
+) (*resource.StatusResult, error) {
+	t.Helper()
+
+	if config.MaxAttempts == 0 {
+		config.MaxAttempts = 30
+	}
+	if config.CheckInterval == 0 {
+		config.CheckInterval = 2 * time.Second
+	}
+
+	for attempt := 0; attempt < config.MaxAttempts; attempt++ {
+		time.Sleep(config.CheckInterval)
+
+		statusReq := &resource.StatusRequest{
+			NativeID:     nativeID,
+			ResourceType: config.ResourceType,
+			TargetConfig: targetConfig,
+		}
+
+		statusResult, err := checker.Status(ctx, statusReq)
+		require.NoError(t, err, "%s status check should not return error", config.OperationName)
+		require.NotNil(t, statusResult, "%s status result should not be nil", config.OperationName)
+		require.NotNil(t, statusResult.ProgressResult, "%s progress result should not be nil", config.OperationName)
+
+		t.Logf("%s status check attempt %d/%d: %s (status: %s)",
+			config.OperationName,
+			attempt+1,
+			config.MaxAttempts,
+			statusResult.ProgressResult.StatusMessage,
+			statusResult.ProgressResult.OperationStatus)
+
+		switch statusResult.ProgressResult.OperationStatus {
+		case resource.OperationStatusSuccess:
+			t.Logf("%s completed successfully with native ID: %s",
+				config.OperationName,
+				statusResult.ProgressResult.NativeID)
+			return statusResult, nil
+
+		case resource.OperationStatusFailure:
+			return statusResult, fmt.Errorf("%s operation failed: %s (error code: %s)",
+				config.OperationName,
+				statusResult.ProgressResult.StatusMessage,
+				statusResult.ProgressResult.ErrorCode)
+
+		case resource.OperationStatusInProgress:
+			// Continue polling
+			if attempt == config.MaxAttempts-1 {
+				return statusResult, fmt.Errorf("%s operation timed out after %d attempts",
+					config.OperationName,
+					config.MaxAttempts)
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("%s operation timed out", config.OperationName)
+}
+
+// WaitForCreate is a convenience wrapper for Create operations
+func WaitForCreate(
+	t *testing.T,
+	ctx context.Context,
+	checker StatusChecker,
+	createResult *resource.CreateResult,
+	targetConfig json.RawMessage,
+	resourceType string,
+) (*resource.StatusResult, error) {
+	t.Helper()
+
+	config := NewPollConfig().
+		ForCreate().
+		WithResourceType(resourceType).
+		Build()
+
+	return PollUntilComplete(t, ctx, checker, createResult.ProgressResult.NativeID, targetConfig, config)
+}
+
+// WaitForCreateWithConfig is a convenience wrapper with custom config
+func WaitForCreateWithConfig(
+	t *testing.T,
+	ctx context.Context,
+	checker StatusChecker,
+	createResult *resource.CreateResult,
+	targetConfig json.RawMessage,
+	resourceType string,
+	pollConfig PollConfig,
+) (*resource.StatusResult, error) {
+	t.Helper()
+
+	if pollConfig.ResourceType == "" {
+		pollConfig.ResourceType = resourceType
+	}
+	if pollConfig.OperationName == "" {
+		pollConfig.OperationName = "Create"
+	}
+
+	return PollUntilComplete(t, ctx, checker, createResult.ProgressResult.NativeID, targetConfig, pollConfig)
+}
+
+// WaitForDelete is a convenience wrapper for Delete operations
+func WaitForDelete(
+	t *testing.T,
+	ctx context.Context,
+	checker StatusChecker,
+	deleteResult *resource.DeleteResult,
+	targetConfig json.RawMessage,
+	resourceType string,
+) (*resource.StatusResult, error) {
+	t.Helper()
+
+	config := NewPollConfig().
+		ForDelete().
+		WithResourceType(resourceType).
+		Build()
+
+	return PollUntilComplete(t, ctx, checker, deleteResult.ProgressResult.NativeID, targetConfig, config)
+}
+
+// WaitForUpdate is a convenience wrapper for Update operations
+func WaitForUpdate(
+	t *testing.T,
+	ctx context.Context,
+	checker StatusChecker,
+	updateResult *resource.UpdateResult,
+	targetConfig json.RawMessage,
+	resourceType string,
+) (*resource.StatusResult, error) {
+	t.Helper()
+
+	config := NewPollConfig().
+		ForUpdate().
+		WithResourceType(resourceType).
+		Build()
+
+	return PollUntilComplete(t, ctx, checker, updateResult.ProgressResult.NativeID, targetConfig, config)
+}
+
+// Reader defines the interface for reading resources
+type Reader interface {
+	Read(ctx context.Context, request *resource.ReadRequest) (*resource.ReadResult, error)
+}
+
+// WaitForDeleteComplete polls until a Read returns NotFound (resource fully deleted)
+func WaitForDeleteComplete(
+	t *testing.T,
+	ctx context.Context,
+	reader Reader,
+	nativeID string,
+	targetConfig json.RawMessage,
+	resourceType string,
+) error {
+	t.Helper()
+
+	config := DefaultPollConfig()
+
+	for attempt := 0; attempt < config.MaxAttempts; attempt++ {
+		time.Sleep(config.CheckInterval)
+
+		readReq := &resource.ReadRequest{
+			NativeID:     nativeID,
+			ResourceType: resourceType,
+			TargetConfig: targetConfig,
+		}
+
+		readResult, err := reader.Read(ctx, readReq)
+		if err != nil {
+			// API error - might be deleted
+			t.Logf("Delete check attempt %d/%d: error (may be deleted): %v", attempt+1, config.MaxAttempts, err)
+			return nil
+		}
+
+		if readResult.ErrorCode == resource.OperationErrorCodeNotFound {
+			t.Logf("Delete completed - resource no longer exists")
+			return nil
+		}
+
+		t.Logf("Delete check attempt %d/%d: resource still exists (status may be DELETING)", attempt+1, config.MaxAttempts)
+	}
+
+	return fmt.Errorf("resource still exists after %d attempts", config.MaxAttempts)
 }

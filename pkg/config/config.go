@@ -5,30 +5,26 @@
 package config
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 
-	"github.com/gophercloud/gophercloud/v2"
-	"github.com/gophercloud/gophercloud/v2/openstack"
 	"github.com/platform-engineering-labs/formae/pkg/model"
 )
 
-// Config holds OpenStack authentication configuration
-// Note: Only AuthURL and Region are stored in the target config.
-// Credentials (Username, Password, ProjectID, DomainName) are always
-// read from environment variables to avoid storing secrets in the database.
+// Config holds OVH REST API authentication configuration.
+// OVHEndpoint can be stored in target config (non-sensitive).
+// Credentials (ApplicationKey, ApplicationSecret, ConsumerKey) are always
+// read from environment variables to avoid storing secrets.
 type Config struct {
 	// Stored in target config (non-sensitive)
-	AuthURL string `json:"authURL"` // https://auth.cloud.ovh.net/v3
-	Region  string `json:"region"`  // GRA11, SBG5, BHS5, US-EAST-VA, etc.
+	OVHEndpoint string `json:"OVHEndpoint"` // ovh-eu, ovh-ca, ovh-us, etc.
 
 	// Read from environment variables only (never stored)
-	Username   string `json:"-"` // From OS_USERNAME
-	Password   string `json:"-"` // From OS_PASSWORD
-	ProjectID  string `json:"-"` // From OS_PROJECT_ID
-	DomainName string `json:"-"` // From OS_USER_DOMAIN_NAME
+	ApplicationKey    string `json:"-"` // From OVH_APPLICATION_KEY
+	ApplicationSecret string `json:"-"` // From OVH_APPLICATION_SECRET
+	ConsumerKey       string `json:"-"` // From OVH_CONSUMER_KEY
+	CloudProjectID    string `json:"-"` // From OVH_CLOUD_PROJECT_ID
 }
 
 // FromTarget extracts OVH configuration from a Target
@@ -39,8 +35,8 @@ func FromTarget(target *model.Target) (*Config, error) {
 	return FromTargetConfig(target.Config)
 }
 
-// FromTargetConfig extracts OVH configuration from a TargetConfig JSON
-// Only AuthURL and Region are read from the target config.
+// FromTargetConfig extracts OVH configuration from a TargetConfig JSON.
+// Only OVHEndpoint is read from the target config.
 // Credentials are always read from environment variables.
 func FromTargetConfig(targetConfig json.RawMessage) (*Config, error) {
 	var cfg Config
@@ -52,67 +48,42 @@ func FromTargetConfig(targetConfig json.RawMessage) (*Config, error) {
 		}
 	}
 
-	// AuthURL and Region can fall back to environment variables
-	if cfg.AuthURL == "" {
-		cfg.AuthURL = os.Getenv("OS_AUTH_URL")
+	// OVHEndpoint can fall back to environment variable
+	if cfg.OVHEndpoint == "" {
+		cfg.OVHEndpoint = os.Getenv("OVH_ENDPOINT")
 	}
-	if cfg.Region == "" {
-		cfg.Region = os.Getenv("OS_REGION_NAME")
+	// Default to ovh-eu if not specified
+	if cfg.OVHEndpoint == "" {
+		cfg.OVHEndpoint = "ovh-eu"
 	}
 
 	// Credentials are ALWAYS read from environment variables (never stored)
-	cfg.Username = os.Getenv("OS_USERNAME")
-	cfg.Password = os.Getenv("OS_PASSWORD")
-	cfg.ProjectID = os.Getenv("OS_PROJECT_ID")
-	cfg.DomainName = os.Getenv("OS_USER_DOMAIN_NAME")
-	if cfg.DomainName == "" {
-		cfg.DomainName = "Default" // OVH default
-	}
-
-	// Validate required fields
-	if cfg.AuthURL == "" {
-		return nil, fmt.Errorf("authURL is required (set OS_AUTH_URL or provide in target config)")
-	}
-	if cfg.Region == "" {
-		return nil, fmt.Errorf("region is required (set OS_REGION_NAME or provide in target config)")
-	}
-	if cfg.Username == "" {
-		return nil, fmt.Errorf("OS_USERNAME environment variable is required")
-	}
-	if cfg.Password == "" {
-		return nil, fmt.Errorf("OS_PASSWORD environment variable is required")
-	}
-	if cfg.ProjectID == "" {
-		return nil, fmt.Errorf("OS_PROJECT_ID environment variable is required")
-	}
+	cfg.ApplicationKey = os.Getenv("OVH_APPLICATION_KEY")
+	cfg.ApplicationSecret = os.Getenv("OVH_APPLICATION_SECRET")
+	cfg.ConsumerKey = os.Getenv("OVH_CONSUMER_KEY")
+	cfg.CloudProjectID = os.Getenv("OVH_CLOUD_PROJECT_ID")
 
 	return &cfg, nil
 }
 
-// ToAuthOptions converts Config to gophercloud AuthOptions
-func (c *Config) ToAuthOptions() gophercloud.AuthOptions {
-	return gophercloud.AuthOptions{
-		IdentityEndpoint: c.AuthURL,
-		Username:         c.Username,
-		Password:         c.Password,
-		TenantID:         c.ProjectID,
-		DomainName:       c.DomainName,
-		AllowReauth:      true,
+// Validate checks that required OVH REST API fields are set
+func (c *Config) Validate() error {
+	if c.ApplicationKey == "" {
+		return fmt.Errorf("OVH_APPLICATION_KEY environment variable is required")
 	}
+	if c.ApplicationSecret == "" {
+		return fmt.Errorf("OVH_APPLICATION_SECRET environment variable is required")
+	}
+	if c.ConsumerKey == "" {
+		return fmt.Errorf("OVH_CONSUMER_KEY environment variable is required")
+	}
+	if c.CloudProjectID == "" {
+		return fmt.Errorf("OVH_CLOUD_PROJECT_ID environment variable is required")
+	}
+	return nil
 }
 
-// Authenticate creates an authenticated OpenStack provider client
-func (c *Config) Authenticate() (*gophercloud.ProviderClient, error) {
-	opts := c.ToAuthOptions()
-	provider, err := openstack.NewClient(opts.IdentityEndpoint)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create OpenStack client: %w", err)
-	}
-
-	ctx := context.Background()
-	err = openstack.Authenticate(ctx, provider, opts)
-	if err != nil {
-		return nil, fmt.Errorf("failed to authenticate with OpenStack: %w", err)
-	}
-	return provider, nil
+// IsConfigured returns true if all required credentials are set
+func (c *Config) IsConfigured() bool {
+	return c.ApplicationKey != "" && c.ApplicationSecret != "" && c.ConsumerKey != "" && c.CloudProjectID != ""
 }

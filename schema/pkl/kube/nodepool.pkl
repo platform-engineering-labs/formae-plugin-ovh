@@ -1,0 +1,188 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// OVH Managed Kubernetes Node Pool
+/// API: POST /cloud/project/{serviceName}/kube/{kubeId}/nodepool
+module ovh.kube.nodepool
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Kube::NodePool"
+
+/// Node pool status
+typealias NodePoolStatus = "INSTALLING"|"UPDATING"|"REDEPLOYING"|"RESIZING"|"SUSPENDING"|"REOPENING"|"DELETING"|"SUSPENDED"|"ERROR"|"USER_ERROR"|"USER_QUOTA_ERROR"|"USER_NODE_NOT_FOUND_ERROR"|"USER_NODE_SUSPENDED_SERVICE"|"READY"
+
+/// Node pool size status
+typealias SizeStatus = "UNDER_CAPACITY"|"CAPACITY_OK"|"OVER_CAPACITY"
+
+/// Taint effect type
+typealias TaintEffect = "NoSchedule"|"PreferNoSchedule"|"NoExecute"
+
+/// Resolvable reference to a Node Pool
+open class NodePoolResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  hidden id: NodePoolResolvable = (this) { property = "id" }
+
+  hidden name: NodePoolResolvable = (this) { property = "name" }
+}
+
+/// Node taint configuration
+@ovh.SubResourceHint
+open class Taint extends formae.SubResource {
+  /// Taint key
+  key: String
+
+  /// Taint value
+  value: String
+
+  /// Taint effect
+  effect: TaintEffect
+}
+
+/// Node template metadata
+@ovh.SubResourceHint
+open class TemplateMetadata extends formae.SubResource {
+  /// Node annotations
+  annotations: Mapping<String, String>?
+
+  /// Node labels
+  labels: Mapping<String, String>?
+
+  /// Node finalizers
+  finalizers: Listing<String>?
+}
+
+/// Node template spec
+@ovh.SubResourceHint
+open class TemplateSpec extends formae.SubResource {
+  /// Node taints
+  taints: Listing<Taint>?
+
+  /// Mark nodes as unschedulable
+  unschedulable: Boolean?
+}
+
+/// Node template configuration
+@ovh.SubResourceHint
+open class Template extends formae.SubResource {
+  /// Node metadata (labels, annotations)
+  metadata: TemplateMetadata?
+
+  /// Node spec (taints, unschedulable)
+  spec: TemplateSpec?
+}
+
+/// Autoscaling configuration
+@ovh.SubResourceHint
+open class Autoscaling extends formae.SubResource {
+  /// Scale down utilization threshold (0.0 to 1.0)
+  scaleDownUtilizationThreshold: Float?
+
+  /// Seconds before scaling down unneeded nodes
+  scaleDownUnneededTimeSeconds: Int?
+
+  /// Seconds before scaling down unready nodes
+  scaleDownUnreadyTimeSeconds: Int?
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class NodePool extends formae.Resource {
+  hidden parent = this
+
+  /// Cloud project service name (project ID)
+  @ovh.FieldHint { required = true; createOnly = true }
+  serviceName: String
+
+  /// Kubernetes cluster ID
+  @ovh.FieldHint { required = true; createOnly = true }
+  kubeId: (String|formae.Resolvable)
+
+  /// Node pool name (no underscores allowed)
+  @ovh.FieldHint { required = true; createOnly = true }
+  name: String
+
+  /// Flavor name for nodes (e.g., "b2-7", "b2-15")
+  @ovh.FieldHint { required = true; createOnly = true }
+  flavorName: String
+
+  /// Desired number of nodes
+  desiredNodes: Int?
+
+  /// Minimum number of nodes (for autoscaling)
+  minNodes: Int?
+
+  /// Maximum number of nodes (for autoscaling)
+  maxNodes: Int?
+
+  /// Enable autoscaling
+  autoscale: Boolean?
+
+  /// Autoscaling configuration
+  autoscaling: Autoscaling?
+
+  /// Enable anti-affinity (spread nodes across hypervisors)
+  @ovh.FieldHint { createOnly = true }
+  antiAffinity: Boolean?
+
+  /// Enable monthly billing for nodes
+  @ovh.FieldHint { createOnly = true }
+  monthlyBilled: Boolean?
+
+  /// Availability zones (mandatory for multi-zone clusters)
+  @ovh.FieldHint { createOnly = true }
+  availabilityZones: Listing<String>?
+
+  /// Node template configuration
+  template: Template?
+
+  // === Computed/Output fields ===
+
+  /// Node pool ID
+  @ovh.FieldHint { persist = false }
+  id: String?
+
+  /// Flavor (full flavor name)
+  @ovh.FieldHint { persist = false }
+  flavor: String?
+
+  /// Node pool status
+  @ovh.FieldHint { persist = false }
+  status: NodePoolStatus?
+
+  /// Size status (capacity)
+  @ovh.FieldHint { persist = false }
+  sizeStatus: SizeStatus?
+
+  /// Current number of nodes
+  @ovh.FieldHint { persist = false }
+  currentNodes: Int?
+
+  /// Number of available/ready nodes
+  @ovh.FieldHint { persist = false }
+  availableNodes: Int?
+
+  /// Number of up-to-date nodes
+  @ovh.FieldHint { persist = false }
+  upToDateNodes: Int?
+
+  /// Creation timestamp
+  @ovh.FieldHint { persist = false }
+  createdAt: String?
+
+  /// Last update timestamp
+  @ovh.FieldHint { persist = false }
+  updatedAt: String?
+
+  hidden res: NodePoolResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}

@@ -1,4 +1,4 @@
-# OVH Cloud Plugin for formae
+# OVH Cloud Plugin for Formae
 
 [![CI](https://github.com/platform-engineering-labs/formae-plugin-ovh/actions/workflows/ci.yml/badge.svg)](https://github.com/platform-engineering-labs/formae-plugin-ovh/actions/workflows/ci.yml)
 
@@ -128,4 +128,3 @@ The `scripts/ci/clean-environment.sh` script cleans up test resources. It runs b
 This plugin is licensed under the [Functional Source License, Version 1.1, ALv2 Future License (FSL-1.1-ALv2)](LICENSE).
 
 Copyright 2025 Platform Engineering Labs Inc.
-

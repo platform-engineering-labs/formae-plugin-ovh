@@ -1,0 +1,81 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// OVH Cloud Gateway
+/// Creates a gateway on an existing private network subnet.
+/// API: POST /cloud/project/{serviceName}/region/{regionName}/network/{networkId}/subnet/{subnetId}/gateway
+module gateway
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Network::Gateway"
+
+/// Gateway model sizes
+typealias GatewayModel = "s"|"m"|"l"
+
+/// Resolvable reference to a Gateway resource
+/// Use this to reference a gateway's properties in dependent resources
+open class GatewayResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  hidden id: GatewayResolvable = (this) { property = "id" }
+
+  hidden name: GatewayResolvable = (this) { property = "name" }
+
+  hidden region: GatewayResolvable = (this) { property = "region" }
+
+  hidden status: GatewayResolvable = (this) { property = "status" }
+
+  hidden model: GatewayResolvable = (this) { property = "model" }
+
+  hidden externalInformation: GatewayResolvable = (this) { property = "externalInformation" }
+
+  /// Gateway interfaces (each with networkId, subnetId, ip)
+  hidden interfaces: GatewayResolvable = (this) { property = "interfaces" }
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class Gateway extends formae.Resource {
+  /// Gateway model size (s, m, l)
+  @ovh.FieldHint {
+    required = true
+  }
+  model: GatewayModel
+
+  /// Gateway name
+  @ovh.FieldHint {
+    required = true
+  }
+  name: String
+
+  /// Network ID where the gateway will be attached.
+  /// Used in URL path: /network/{networkId}/subnet/{subnetId}/gateway
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  network_id: String|formae.Resolvable
+
+  /// Subnet ID where the gateway will be attached.
+  /// Used in URL path: /network/{networkId}/subnet/{subnetId}/gateway
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  subnet_id: String|formae.Resolvable
+
+  hidden parent = this
+
+  /// Provides resolvable references to this gateway's properties
+  hidden res: GatewayResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}
