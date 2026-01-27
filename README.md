@@ -15,11 +15,44 @@ make install
 
 This plugin supports **10 OVH Public Cloud resource types** across 3 services:
 
-| Service | Resources | Description |
-|---------|-----------|-------------|
-| Compute | Instance, Keypair | Virtual machines and SSH keys |
-| Network | Network, Subnet, Port, Router, FloatingIP, SecurityGroup, SecurityGroupRule | Virtual networking components |
-| Volume | Volume | Block storage volumes |
+| Type | Discoverable | Extractable | Comment |
+|------|--------------|-------------|----------|
+| OVH::Compute::Instance | ✅ | ✅ |  |
+| OVH::Compute::SSHKey | ✅ | ✅ |  |
+| OVH::Compute::Volume | ✅ | ✅ |  |
+| OVH::Compute::VolumeAttachment | ✅ | ✅ |  |
+| OVH::Compute::VolumeSnapshot | ✅ | ✅ |  |
+| OVH::DNS::Record | ✅ | ✅ |  |
+| OVH::DNS::Redirection | ✅ | ✅ |  |
+| OVH::DNS::Zone | ✅ | ✅ |  |
+| OVH::Database::Database | ✅ | ✅ |  |
+| OVH::Database::Integration | ✅ | ✅ |  |
+| OVH::Database::IpRestriction | ✅ | ✅ |  |
+| OVH::Database::KafkaAcl | ✅ | ✅ |  |
+| OVH::Database::KafkaTopic | ✅ | ✅ |  |
+| OVH::Database::PostgresqlConnectionPool | ✅ | ✅ |  |
+| OVH::Database::Service | ✅ | ✅ |  |
+| OVH::Database::User | ✅ | ✅ |  |
+| OVH::Kube::Cluster | ✅ | ✅ |  |
+| OVH::Kube::IpRestriction | ✅ | ✅ |  |
+| OVH::Kube::NodePool | ✅ | ✅ |  |
+| OVH::Kube::Oidc | ✅ | ✅ |  |
+| OVH::Network::FloatingIP | ✅ | ✅ |  |
+| OVH::Network::Gateway | ✅ | ✅ |  |
+| OVH::Network::Network | ✅ | ✅ |  |
+| OVH::Network::Port | ✅ | ✅ |  |
+| OVH::Network::PrivateNetwork | ✅ | ✅ |  |
+| OVH::Network::PrivateSubnet | ✅ | ✅ |  |
+| OVH::Network::Router | ✅ | ✅ |  |
+| OVH::Network::SecurityGroup | ✅ | ✅ |  |
+| OVH::Network::SecurityGroupRule | ✅ | ✅ |  |
+| OVH::Network::Subnet | ✅ | ✅ |  |
+| OVH::Registry::IpRestriction | ✅ | ✅ |  |
+| OVH::Registry::Oidc | ✅ | ✅ |  |
+| OVH::Registry::Registry | ✅ | ✅ |  |
+| OVH::Registry::User | ✅ | ✅ |  |
+| OVH::Storage::Container | ✅ | ✅ |  |
+| OVH::Storage::S3Bucket | ✅ | ✅ |  |
 
 See [`schema/pkl/`](schema/pkl/) for the complete list of supported resource types.
 
