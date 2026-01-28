@@ -1,0 +1,40 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+import "@formae/formae.pkl"
+import "@ovh/storage/container.pkl"
+import "@ovh/storage/s3bucket.pkl"
+
+/// Storage Resources
+/// Object storage containers for the project
+class StorageResources {
+    name: String
+    region: String
+    projectId: String
+
+    /// Object storage container for application data
+    /// Uses OVH SWIFT-compatible object storage
+    hidden dataContainer: container.Container = new {
+        label = "lifeline-swift-container"
+        containerName = outer.name + "-swift"
+        region = outer.region
+        archive = false
+    }
+
+    /// Archive container for backups and long-term storage
+    hidden archiveContainer: s3bucket.S3Bucket = new {
+        label = "lifeline-s3-container"
+        serviceName = outer.projectId
+        name = outer.name + "-s3"
+        region = outer.region
+
+    }
+
+    hidden resources: Listing<formae.Resource> = new {
+        dataContainer
+        archiveContainer
+    }
+}

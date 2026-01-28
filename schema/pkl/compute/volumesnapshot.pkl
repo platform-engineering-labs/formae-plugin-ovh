@@ -1,0 +1,57 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module volumesnapshot
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Compute::VolumeSnapshot"
+
+/// Resolvable reference to a VolumeSnapshot resource
+/// Use this to reference a snapshot's properties in dependent resources
+open class VolumeSnapshotResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  /// The snapshot's unique identifier
+  hidden id: VolumeSnapshotResolvable = (this) {
+    property = "id"
+  }
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class VolumeSnapshot extends formae.Resource {
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  volume_id: String|formae.Resolvable
+
+  @ovh.FieldHint {
+    required = true
+  }
+  name: String
+
+  description: String?
+
+  // Computed fields (not user-provided)
+  // id: String
+  // status: String
+  // createdAt: String
+  // size: Int
+  // region: String
+
+  local parent = this
+
+  /// Provides resolvable references to this snapshot's properties
+  hidden res: VolumeSnapshotResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}

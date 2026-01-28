@@ -1,0 +1,64 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// OVH Database Kafka ACL
+/// Manages access control for Kafka topics
+/// API: POST /cloud/project/{serviceName}/database/kafka/{clusterId}/acl
+module ovh.database.kafka_acl
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Database::KafkaAcl"
+
+/// Kafka ACL permission types
+typealias KafkaPermission = "admin"|"read"|"write"|"readwrite"
+
+/// Resolvable reference to a Kafka ACL
+open class KafkaAclResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  hidden id: KafkaAclResolvable = (this) { property = "id" }
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class KafkaAcl extends formae.Resource {
+  hidden parent = this
+
+  /// Cloud project service name
+  @ovh.FieldHint { required = true; createOnly = true }
+  serviceName: String
+
+  /// Kafka cluster ID
+  @ovh.FieldHint { required = true; createOnly = true }
+  clusterId: (String|formae.Resolvable)
+
+  /// Username this ACL applies to
+  @ovh.FieldHint { required = true; createOnly = true }
+  username: (String|formae.Resolvable)
+
+  /// Topic pattern (supports wildcards like "logs-*")
+  @ovh.FieldHint { required = true; createOnly = true }
+  topic: String
+
+  /// Permission level
+  @ovh.FieldHint { required = true }
+  permission: KafkaPermission
+
+  // === Computed/Output fields ===
+
+  /// ACL ID
+  @ovh.FieldHint 
+  id: String?
+
+  hidden res: KafkaAclResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}

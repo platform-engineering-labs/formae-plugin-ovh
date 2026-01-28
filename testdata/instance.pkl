@@ -1,0 +1,61 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@ovh/compute/instance.pkl"
+import "@ovh/network/privatenetwork.pkl"
+import "@ovh/network/privatesubnet.pkl"
+
+import "./vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  // Create a private network
+  local privateNetwork = new privatenetwork.PrivateNetwork {
+    label = "test-private-network"
+    name = "formae-test-network-\(v.testRunID)"
+    regions = new Listing { v.region }
+    vlanId = 100
+  }
+
+  privateNetwork
+
+  // Create a subnet within the private network (required for instance attachment)
+
+   local privateSubnet = new privatesubnet.PrivateSubnet {
+    label = "plugin-sdk-test-subnet"
+    region = v.region
+    network_id = privateNetwork.res.id
+    network = "10.0.3.0/24"
+    dhcp = true
+    noGateway = false
+    start = "10.0.3.2"
+    end = "10.0.3.254"
+  }
+
+  privateSubnet
+
+  // Instance that uses the private network (after subnet is created)
+  // Note: OVH's REST API uses OVH network IDs (pn-XXXX_Y format), not OpenStack UUIDs
+  // Public IP is assigned automatically by OVH when no networks are specified,
+  // or you can attach to a private network created via OVH API
+  new instance.Instance {
+    label = "plugin-sdk-test-instance"
+    name = "formae-plugin-sdk-test-\(v.testRunID)"
+    flavorId = v.flavorID
+    imageId = v.ubuntuImageID
+    region = v.region
+    networks = new Listing {
+      // Private network - reference via resolvable (uses OVH network ID format)
+      new instance.NetworkParams {
+        networkId = privateNetwork.res.id
+      }
+    }
+  }
+}

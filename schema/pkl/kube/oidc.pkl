@@ -1,0 +1,71 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// OVH Managed Kubernetes OIDC Provider Configuration
+/// API: PUT /cloud/project/{serviceName}/kube/{kubeId}/openIdConnect
+module ovh.kube.oidc
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Kube::Oidc"
+
+/// Resolvable reference to OIDC configuration
+open class OidcResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  hidden clientId: OidcResolvable = (this) { property = "clientId" }
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "clientId"
+}
+open class Oidc extends formae.Resource {
+  hidden parent = this
+
+  /// Cloud project service name (project ID)
+  @ovh.FieldHint { required = true; createOnly = true }
+  serviceName: String
+
+  /// Kubernetes cluster ID
+  @ovh.FieldHint { required = true; createOnly = true }
+  kubeId: (String|formae.Resolvable)
+
+  /// OIDC client ID
+  @ovh.FieldHint { required = true }
+  clientId: String
+
+  /// OIDC issuer URL
+  @ovh.FieldHint { required = true }
+  issuerUrl: String
+
+  /// JWT claim to use as the user name
+  usernameClaim: String?
+
+  /// Prefix for username claims
+  usernamePrefix: String?
+
+  /// JWT claim to use as the user's groups
+  groupsClaim: Listing<String>?
+
+  /// Prefix for group claims
+  groupsPrefix: String?
+
+  /// Required claims (key-value pairs that must be present)
+  requiredClaim: Listing<String>?
+
+  /// Signing algorithms accepted (default: RS256)
+  signingAlgorithms: Listing<String>?
+
+  /// PEM-encoded CA certificate for OIDC provider
+  caContent: String?
+
+  hidden res: OidcResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}

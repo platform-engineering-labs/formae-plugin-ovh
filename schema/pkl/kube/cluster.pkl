@@ -1,0 +1,200 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// OVH Managed Kubernetes Cluster
+/// API: POST /cloud/project/{serviceName}/kube
+module ovh.kube.cluster
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Kube::Cluster"
+
+/// Cluster update policy
+/// - ALWAYS_UPDATE: Always update to latest version
+/// - MINIMAL_DOWNTIME: Update with minimal downtime
+/// - NEVER_UPDATE: Never auto-update
+typealias UpdatePolicy = "ALWAYS_UPDATE"|"MINIMAL_DOWNTIME"|"NEVER_UPDATE"
+
+/// Kube-proxy mode
+typealias KubeProxyMode = "iptables"|"ipvs"
+
+/// Cluster status
+typealias ClusterStatus = "INSTALLING"|"UPDATING"|"RESETTING"|"SUSPENDING"|"REOPENING"|"DELETING"|"SUSPENDED"|"ERROR"|"USER_ERROR"|"USER_QUOTA_ERROR"|"READY"
+
+/// Resolvable reference to a Kubernetes Cluster
+open class ClusterResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  hidden id: ClusterResolvable = (this) { property = "id" }
+
+  hidden kubeconfig: ClusterResolvable = (this) { property = "kubeconfig" }
+
+  hidden url: ClusterResolvable = (this) { property = "url" }
+}
+
+/// API Server admission plugins configuration
+@ovh.SubResourceHint
+open class AdmissionPlugins extends formae.SubResource {
+  /// List of enabled admission plugins
+  enabled: Listing<String>?
+
+  /// List of disabled admission plugins
+  disabled: Listing<String>?
+}
+
+/// API Server customization
+@ovh.SubResourceHint
+open class ApiServerCustomization extends formae.SubResource {
+  /// Admission plugins configuration
+  admissionPlugins: AdmissionPlugins?
+}
+
+/// IPTables kube-proxy configuration
+@ovh.SubResourceHint
+open class KubeProxyIptables extends formae.SubResource {
+  /// Minimum sync period (RFC3339 duration, e.g., "PT1S")
+  minSyncPeriod: String?
+
+  /// Sync period (RFC3339 duration)
+  syncPeriod: String?
+}
+
+/// IPVS kube-proxy configuration
+@ovh.SubResourceHint
+open class KubeProxyIpvs extends formae.SubResource {
+  /// Minimum sync period (RFC3339 duration)
+  minSyncPeriod: String?
+
+  /// Sync period (RFC3339 duration)
+  syncPeriod: String?
+
+  /// IPVS scheduler (rr, lc, dh, sh, sed, nq)
+  scheduler: String?
+
+  /// TCP connection timeout
+  tcpTimeout: String?
+
+  /// TCP FIN timeout
+  tcpFinTimeout: String?
+
+  /// UDP timeout
+  udpTimeout: String?
+}
+
+/// Kube-proxy customization
+@ovh.SubResourceHint
+open class KubeProxyCustomization extends formae.SubResource {
+  /// IPTables configuration
+  iptables: KubeProxyIptables?
+
+  /// IPVS configuration
+  ipvs: KubeProxyIpvs?
+}
+
+/// Private network configuration
+@ovh.SubResourceHint
+open class PrivateNetworkConfiguration extends formae.SubResource {
+  /// Default vRack gateway IP
+  defaultVrackGateway: String?
+
+  /// Use private network routing as default
+  privateNetworkRoutingAsDefault: Boolean?
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class Cluster extends formae.Resource {
+  hidden parent = this
+
+  /// Cloud project service name (project ID)
+  @ovh.FieldHint { required = true; createOnly = true }
+  serviceName: String
+
+  /// Cluster name
+  name: String?
+
+  /// Region where the cluster is deployed
+  @ovh.FieldHint { required = true; createOnly = true }
+  region: String
+
+  /// Kubernetes version (e.g., "1.28")
+  version: String?
+
+  /// Cluster plan (empty for default)
+  @ovh.FieldHint { createOnly = true }
+  plan: String?
+
+  /// Update policy for the cluster
+  updatePolicy: UpdatePolicy?
+
+  /// Kube-proxy mode
+  @ovh.FieldHint { createOnly = true }
+  kubeProxyMode: KubeProxyMode?
+
+  /// Private network ID (OpenStack network UUID)
+  @ovh.FieldHint { createOnly = true }
+  privateNetworkId: (String|formae.Resolvable)?
+
+  /// Private network configuration
+  @ovh.FieldHint { createOnly = true }
+  privateNetworkConfiguration: PrivateNetworkConfiguration?
+
+  /// Subnet ID for load balancers
+  @ovh.FieldHint { createOnly = true }
+  loadBalancersSubnetId: (String|formae.Resolvable)?
+
+  /// Subnet ID for nodes
+  @ovh.FieldHint { createOnly = true }
+  nodesSubnetId: (String|formae.Resolvable)?
+
+  /// API server customization
+  customizationApiserver: ApiServerCustomization?
+
+  /// Kube-proxy customization
+  customizationKubeProxy: KubeProxyCustomization?
+
+  // === Computed/Output fields ===
+
+  /// Cluster ID
+  @ovh.FieldHint 
+  id: String?
+
+  /// Cluster status
+  @ovh.FieldHint 
+  status: ClusterStatus?
+
+  /// Kubernetes API URL
+  @ovh.FieldHint 
+  url: String?
+
+  /// Nodes URL
+  @ovh.FieldHint 
+  nodesUrl: String?
+
+  /// Whether the cluster is up to date
+  @ovh.FieldHint 
+  isUpToDate: Boolean?
+
+  /// Whether the control plane is up to date
+  @ovh.FieldHint 
+  controlPlaneIsUpToDate: Boolean?
+
+  /// Available upgrade versions
+  @ovh.FieldHint 
+  nextUpgradeVersions: Listing<String>?
+
+  /// Kubeconfig for cluster access (base64 encoded)
+  @ovh.FieldHint 
+  kubeconfig: String?
+
+  hidden res: ClusterResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}

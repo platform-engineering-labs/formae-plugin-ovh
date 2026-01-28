@@ -1,0 +1,63 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+import "@formae/formae.pkl"
+import "@ovh/network/network.pkl"
+import "@ovh/network/subnet.pkl"
+import "@ovh/network/router.pkl"
+import "@ovh/network/floatingip.pkl"
+
+/// OpenStack Network Resources
+/// These use the OpenStack Neutron API via OVH Public Cloud
+class NetworkResources {
+    name: String
+    networkCidr: String
+    subnetCidr: String
+    extNetID: String
+
+    /// OpenStack network (equivalent to AWS VPC)
+    hidden network: network.Network = new {
+        label = "lifeline-network"
+        name = outer.name + "-network"
+        description = "OpenStack network for lifeline project"
+        admin_state_up = true
+        shared = false
+        mtu = 1500
+        tags = new Listing {}
+    }
+
+    /// OpenStack subnet within the network
+    hidden subnet: subnet.Subnet = new {
+        label = "lifeline-subnet"
+        name = outer.name + "-subnet"
+        description = "Main subnet for lifeline project"
+        network_id = network.res.id
+        cidr = subnetCidr
+        ip_version = 4
+        enable_dhcp = true
+        dns_nameservers = new Listing {
+            "8.8.8.8"
+            "8.8.4.4"
+        }
+    }
+
+    /// Router with external gateway (equivalent to AWS IGW + route table)
+    hidden router: router.Router = new {
+        label = "lifeline-router"
+        name = outer.name + "-router"
+        description = "Router for external connectivity"
+        admin_state_up = true
+        external_gateway_info = new router.GatewayInfo {
+            network_id = extNetID
+        }
+    }
+
+    hidden resources: Listing<formae.Resource> = new {
+        network
+        subnet
+        router
+    }
+}

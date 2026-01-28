@@ -1,0 +1,28 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "./vars.pkl" as v
+
+import "@ovh/network/network.pkl"
+
+forma {
+  v.stack
+  v.target
+
+  new network.Network {
+    label = "plugin-sdk-test-network"
+    name = "formae-plugin-sdk-test-\(v.testRunID)"
+    description = "Test network for plugin SDK tests" // description is CreateOnly on OpenStack
+    admin_state_up = false // This is the mutable field being tested
+    tags {
+      "env:test"
+      "managed-by:formae"
+      "updated:true"  // New tag added in update
+    }
+  }
+}

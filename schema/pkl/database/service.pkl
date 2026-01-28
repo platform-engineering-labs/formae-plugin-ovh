@@ -1,0 +1,204 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// OVH Database Service (Managed Database Cluster)
+/// Supports: MongoDB, PostgreSQL, MySQL, Redis, Kafka, Cassandra, M3DB, OpenSearch, Grafana
+/// API: POST /cloud/project/{serviceName}/database/{engine}
+module ovh.database.service
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Database::Service"
+
+/// Supported database engines
+typealias Engine = "mongodb"|"postgresql"|"mysql"|"redis"|"kafka"|"cassandra"|"m3db"|"opensearch"|"grafana"|"m3aggregator"|"kafkaConnect"|"kafkaMirrorMaker"
+
+/// Service plan tiers
+/// - discovery: Entry-level for MongoDB only
+/// - essential: Single node, no replication
+/// - business: Multi-node with replication
+/// - enterprise: Advanced features and performance
+typealias Plan = "discovery"|"essential"|"business"|"enterprise"
+
+/// Network type for the service
+typealias NetworkType = "public"|"private"
+
+/// Service status
+typealias ServiceStatus = "CREATING"|"READY"|"PENDING"|"MAINTENANCE"|"ERROR"|"DELETING"
+
+/// Resolvable reference to a Database Service
+open class ServiceResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  hidden id: ServiceResolvable = (this) { property = "id" }
+
+  hidden endpoints: ServiceResolvable = (this) { property = "endpoints" }
+}
+
+/// Node configuration for the database cluster
+@ovh.SubResourceHint
+open class Node extends formae.SubResource {
+  /// Region where the node is deployed
+  @ovh.FieldHint { required = true; createOnly = true }
+  region: String
+
+  /// OpenStack private network ID (for private networking)
+  @ovh.FieldHint { createOnly = true }
+  networkId: String?
+
+  /// Private subnet ID
+  @ovh.FieldHint { createOnly = true }
+  subnetId: String?
+}
+
+/// Backup configuration
+@ovh.SubResourceHint
+open class Backup extends formae.SubResource {
+  /// Regions where backups are stored (max 1 for MongoDB, max 2 for others)
+  regions: Listing<String>?
+
+  /// Daily backup time in HH:MM format (UTC)
+  time: String?
+}
+
+/// Disk configuration
+@ovh.SubResourceHint
+open class Disk extends formae.SubResource {
+  /// Disk size in GB
+  size: Int?
+
+  /// Disk type (computed)
+  @ovh.FieldHint 
+  type: String?
+}
+
+/// Service endpoint for connecting to the database
+@ovh.SubResourceHint
+open class Endpoint extends formae.SubResource {
+  /// Component name (e.g., "mongodb", "postgresql")
+  @ovh.FieldHint 
+  component: String?
+
+  /// Connection domain/hostname
+  @ovh.FieldHint 
+  domain: String?
+
+  /// Connection path
+  @ovh.FieldHint 
+  path: String?
+
+  /// Connection port
+  @ovh.FieldHint 
+  port: Int?
+
+  /// Connection scheme (e.g., "mongodb+srv", "https")
+  @ovh.FieldHint 
+  scheme: String?
+
+  /// Whether SSL is enabled
+  @ovh.FieldHint 
+  ssl: Boolean?
+
+  /// SSL mode
+  @ovh.FieldHint 
+  sslMode: String?
+
+  /// Full connection URI
+  @ovh.FieldHint 
+  uri: String?
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class Service extends formae.Resource {
+  hidden parent = this
+
+  /// Cloud project service name (project ID)
+  @ovh.FieldHint { required = true; createOnly = true }
+  serviceName: String
+
+  /// Database engine type
+  @ovh.FieldHint { required = true; createOnly = true }
+  engine: Engine
+
+  /// Engine version (e.g., "14" for PostgreSQL 14)
+  @ovh.FieldHint { required = true }
+  version: String
+
+  /// Service plan tier
+  @ovh.FieldHint { required = true }
+  plan: Plan
+
+  /// Node flavor (compute/memory configuration)
+  @ovh.FieldHint { required = true }
+  flavor: String
+
+  /// Cluster nodes configuration (minimum 1 node required)
+  @ovh.FieldHint { required = true }
+  nodes: Listing<Node>
+
+  /// Service description
+  description: String?
+
+  /// Disk configuration
+  disk: Disk?
+
+  /// Backup configuration
+  backup: Backup?
+
+  /// Maintenance window time in HH:MM format (UTC)
+  maintenanceTime: String?
+
+  /// Enable deletion protection
+  deletionProtection: Boolean?
+
+  /// Advanced configuration (engine-specific key-value pairs)
+  /// Not supported for MongoDB
+  advancedConfiguration: Mapping<String, String>?
+
+  // === Kafka-specific options ===
+
+  /// Enable Kafka REST API (Kafka only)
+  kafkaRestApi: Boolean?
+
+  /// Enable Kafka Schema Registry (Kafka only)
+  kafkaSchemaRegistry: Boolean?
+
+  // === OpenSearch-specific options ===
+
+  /// Enable ACLs for OpenSearch
+  opensearchAclsEnabled: Boolean?
+
+  // === Computed/Output fields ===
+
+  /// Service ID (assigned by OVH)
+  @ovh.FieldHint 
+  id: String?
+
+  /// Creation timestamp
+  @ovh.FieldHint 
+  createdAt: String?
+
+  /// Current service status
+  @ovh.FieldHint 
+  status: ServiceStatus?
+
+  /// Network type (public or private)
+  @ovh.FieldHint 
+  networkType: NetworkType?
+
+  /// Service endpoints for connecting to the database
+  @ovh.FieldHint 
+  endpoints: Listing<Endpoint>?
+
+  hidden res: ServiceResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}

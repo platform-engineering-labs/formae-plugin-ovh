@@ -1,0 +1,48 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module redirection
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::DNS::Redirection"
+
+typealias RedirectionType = "visible"|"visiblePermanent"|"invisible"
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class Redirection extends formae.Resource {
+  /// Parent zone name
+  @ovh.FieldHint { required = true; createOnly = true }
+  zone: (String|formae.Resolvable)
+
+  /// Redirection ID
+  @ovh.FieldHint 
+  id: Int?
+
+  /// Subdomain to redirect
+  subDomain: String?
+
+  /// Target URL
+  @ovh.FieldHint { required = true }
+  target: String
+
+  /// Redirection type
+  @ovh.FieldHint { required = true }
+  type: RedirectionType
+
+  /// Keywords for invisible redirections
+  keywords: String?
+
+  /// Title for invisible redirections
+  title: String?
+
+  /// Description for invisible redirections
+  description: String?
+}

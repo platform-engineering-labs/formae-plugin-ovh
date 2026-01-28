@@ -1,0 +1,155 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_conformance:
+        description: 'Run conformance tests'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Set up Pkl
+        uses: pkl-community/setup-pkl@v0
+        with:
+          pkl-version: 0.30.0
+
+      - name: Build
+        run: make build
+
+      - name: Test
+        run: make test-unit
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8.0.0
+        with:
+          version: latest
+
+  pkl-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Pkl
+        uses: pkl-community/setup-pkl@v0
+        with:
+          pkl-version: 0.30.0
+
+      - name: Validate Pkl schemas
+        run: |
+          pkl eval formae-plugin.pkl --format json > /dev/null
+          echo "Manifest validated successfully"
+
+  # Integration and conformance tests run against real cloud resources.
+  # Runs on:
+  # - Push to main (always)
+  # - PRs (only when secrets are available)
+  # - Manual dispatch with run_conformance=true
+  integration-tests:
+    needs: [build, lint, pkl-validate]
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' || github.event.inputs.run_conformance == 'true' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) }}
+    timeout-minutes: 60
+
+    # Uncomment and configure for your cloud provider:
+    # permissions:
+    #   id-token: write  # Required for OIDC
+    #   contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Set up Pkl
+        uses: pkl-community/setup-pkl@v0
+        with:
+          pkl-version: 0.30.0
+
+      # =================================================================
+      # CREDENTIAL SETUP - Uncomment and configure for your provider
+      # =================================================================
+
+      # AWS (OIDC - recommended)
+      # - name: Configure AWS Credentials
+      #   uses: aws-actions/configure-aws-credentials@v4
+      #   with:
+      #     aws-region: us-east-1
+      #     role-to-assume: arn:aws:iam::ACCOUNT_ID:role/ROLE_NAME
+      #     role-session-name: ConformanceTests
+
+      # Azure (OIDC - recommended)
+      # - name: Configure Azure Credentials
+      #   uses: azure/login@v2
+      #   with:
+      #     client-id: ${{ secrets.AZURE_CLIENT_ID }}
+      #     tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+      #     subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # GCP (OIDC - recommended)
+      # - name: Configure GCP Credentials
+      #   uses: google-github-actions/auth@v2
+      #   with:
+      #     workload_identity_provider: projects/PROJECT_ID/locations/global/workloadIdentityPools/POOL/providers/PROVIDER
+      #     service_account: SA_NAME@PROJECT_ID.iam.gserviceaccount.com
+
+      # OpenStack (secrets-based)
+      - name: Configure OpenStack Credentials
+        run: |
+          echo "OS_AUTH_URL=${{ secrets.OS_AUTH_URL }}" >> $GITHUB_ENV
+          echo "OS_USERNAME=${{ secrets.OS_USERNAME }}" >> $GITHUB_ENV
+          echo "OS_PASSWORD=${{ secrets.OS_PASSWORD }}" >> $GITHUB_ENV
+          echo "OS_PROJECT_ID=${{ secrets.OS_PROJECT_ID }}" >> $GITHUB_ENV
+          echo "OS_REGION_NAME=${{ secrets.OS_REGION_NAME }}" >> $GITHUB_ENV
+          echo "OS_USER_DOMAIN_NAME=${{ secrets.OS_USER_DOMAIN_NAME }}" >> $GITHUB_ENV
+          echo "OS_PROJECT_DOMAIN_NAME=${{ secrets.OS_PROJECT_DOMAIN_NAME }}" >> $GITHUB_ENV
+          echo "OS_IDENTITY_API_VERSION=3" >> $GITHUB_ENV
+
+      - name: Install OpenStack CLI
+        run: pip install python-openstackclient
+
+      # =================================================================
+
+      # TODO: Fix integration tests to use new SDK API
+      # - name: Run integration tests
+      #   run: make test-integration
+
+      - name: Install plugin
+        run: make install
+
+      - name: Run conformance tests
+        env:
+          FORMAE_TEST_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: make conformance-test

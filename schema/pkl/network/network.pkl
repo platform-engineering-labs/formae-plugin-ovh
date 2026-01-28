@@ -1,0 +1,76 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module network
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Network::Network"
+
+/// Resolvable reference to a Network resource
+/// Use this to reference a network's properties in dependent resources
+open class NetworkResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  /// The network's unique identifier
+  hidden id: NetworkResolvable = (this) {
+    property = "id"
+  }
+
+  /// The network's name
+  hidden name: NetworkResolvable = (this) {
+    property = "name"
+  }
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class Network extends formae.Resource {
+  @ovh.FieldHint {
+    required = false
+  }
+  name: String?
+
+  @ovh.FieldHint {
+    required = false
+  }
+  description: String?
+
+  @ovh.FieldHint {
+    required = false
+  }
+  admin_state_up: Boolean?
+
+  @ovh.FieldHint {
+    required = false
+    createOnly = true
+  }
+  shared: Boolean?
+
+  @ovh.FieldHint {
+    required = false
+    createOnly = true
+  }
+  mtu: Int?
+
+  @ovh.FieldHint {
+    required = false
+  }
+  tags: Listing<String>? = new Listing {}
+
+  // id is computed by OpenStack - not user-provided
+
+  local parent = this
+
+  /// Provides resolvable references to this network's properties
+  hidden res: NetworkResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}

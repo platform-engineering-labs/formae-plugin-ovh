@@ -1,0 +1,26 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "./vars.pkl" as v
+
+import "@ovh/network/securitygroup.pkl"
+
+forma {
+  v.stack
+  v.target
+
+  new securitygroup.SecurityGroup {
+    label = "plugin-sdk-test-securitygroup"
+    name = "formae-plugin-sdk-test-\(v.testRunID)"
+    description = "Test security group for plugin SDK tests"
+    tags {
+      "env:test"
+      "managed-by:formae"
+    }
+  }
+}

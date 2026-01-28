@@ -1,0 +1,42 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module dns_record
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::DNS::Record"
+
+typealias RecordType = "A"|"AAAA"|"CNAME"|"MX"|"TXT"|"SRV"|"NS"|"DKIM"|"SPF"|"CAA"|"NAPTR"|"LOC"|"SSHFP"|"TLSA"|"PTR"
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class Record extends formae.Resource {
+  /// Parent zone name
+  @ovh.FieldHint { required = true; createOnly = true }
+  zone: (String|formae.Resolvable)
+
+  /// Record ID (assigned by OVH)
+  @ovh.FieldHint 
+  id: Int?
+
+  /// Subdomain (empty string for apex)
+  subDomain: String?
+
+  /// Record type
+  @ovh.FieldHint { required = true; createOnly = true }
+  fieldType: RecordType
+
+  /// Target value
+  @ovh.FieldHint { required = true }
+  target: String
+
+  /// TTL in seconds
+  ttl: Int?
+}

@@ -1,0 +1,95 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// OVH Managed Private Registry (Harbor)
+/// API: POST /cloud/project/{serviceName}/containerRegistry
+module ovh.registry.registry
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Registry::Registry"
+
+/// Registry status
+typealias RegistryStatus = "INSTALLING"|"UPDATING"|"RESTORING"|"SUSPENDING"|"SUSPENDED"|"DELETING"|"ERROR"|"READY"
+
+/// Registry plan codes
+/// - SMALL: Entry level
+/// - MEDIUM: Medium capacity
+/// - LARGE: Large capacity
+typealias PlanCode = "SMALL"|"MEDIUM"|"LARGE"
+
+/// Resolvable reference to a Container Registry
+open class RegistryResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  hidden id: RegistryResolvable = (this) { property = "id" }
+
+  hidden url: RegistryResolvable = (this) { property = "url" }
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class Registry extends formae.Resource {
+  hidden parent = this
+
+  /// Cloud project service name (project ID)
+  @ovh.FieldHint { required = true; createOnly = true }
+  serviceName: String
+
+  /// Registry name
+  @ovh.FieldHint { required = true }
+  name: String
+
+  /// Region where the registry is deployed
+  @ovh.FieldHint { required = true; createOnly = true }
+  region: String
+
+  /// Plan ID (use capabilities API to get available plans)
+  /// Can be upgraded but not downgraded
+  planId: String?
+
+  // === Computed/Output fields ===
+
+  /// Registry ID
+  @ovh.FieldHint 
+  id: String?
+
+  /// Registry status
+  @ovh.FieldHint 
+  status: RegistryStatus?
+
+  /// Registry URL (e.g., "xxxxxx.gra7.container-registry.ovh.net")
+  @ovh.FieldHint 
+  url: String?
+
+  /// Harbor version
+  @ovh.FieldHint 
+  version: String?
+
+  /// Current storage size in bytes
+  @ovh.FieldHint 
+  size: Int?
+
+  /// Whether IAM is enabled
+  @ovh.FieldHint 
+  iamEnabled: Boolean?
+
+  /// Creation timestamp
+  @ovh.FieldHint 
+  createdAt: String?
+
+  /// Last update timestamp
+  @ovh.FieldHint 
+  updatedAt: String?
+
+  hidden res: RegistryResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}

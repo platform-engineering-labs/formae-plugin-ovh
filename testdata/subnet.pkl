@@ -1,0 +1,45 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "./vars.pkl" as v
+
+import "@ovh/network/network.pkl"
+import "@ovh/network/subnet.pkl"
+
+forma {
+  v.stack
+  v.target
+
+  // Define the network that this subnet belongs to
+  local testNetwork = new network.Network {
+    label = "plugin-sdk-test-network"
+    name = "formae-plugin-sdk-test-network-\(v.testRunID)"
+    description = "Test network for subnet plugin SDK tests"
+    admin_state_up = true
+  }
+  testNetwork
+
+  // Create the subnet referencing the network via resolvable
+  new subnet.Subnet {
+    label = "plugin-sdk-test-subnet"
+    name = "formae-plugin-sdk-test-subnet-\(v.testRunID)"
+    network_id = testNetwork.res.id
+    cidr = "10.0.3.0/24"
+    ip_version = 4
+    gateway_ip = "10.0.3.1"
+    enable_dhcp = true
+    dns_nameservers {
+      "8.8.8.8"
+      "8.8.4.4"
+    }
+    tags {
+      "env:test"
+      "managed-by:formae"
+    }
+  }
+}

@@ -1,0 +1,58 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module sshkey
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Compute::SSHKey"
+
+/// Resolvable reference to an SSHKey resource
+/// Use this to reference an SSH key's properties in dependent resources
+open class SSHKeyResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  /// The SSH key's unique identifier
+  hidden id: SSHKeyResolvable = (this) {
+    property = "id"
+  }
+
+  /// The SSH key's name
+  hidden name: SSHKeyResolvable = (this) {
+    property = "name"
+  }
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class SSHKey extends formae.Resource {
+  @ovh.FieldHint {
+    required = true
+  }
+  name: String
+
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  publicKey: String
+
+  // Computed fields (not user-provided)
+  // id: String
+  // fingerprint: String
+  // regions: Listing<String>
+
+  local parent = this
+
+  /// Provides resolvable references to this SSH key's properties
+  hidden res: SSHKeyResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}

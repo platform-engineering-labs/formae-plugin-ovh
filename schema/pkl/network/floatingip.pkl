@@ -1,0 +1,79 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module floatingip
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Network::FloatingIP"
+
+/// Resolvable reference to a FloatingIP resource
+/// Use this to reference a floating IP's properties in dependent resources
+open class FloatingIPResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  /// The floating IP's unique identifier
+  hidden id: FloatingIPResolvable = (this) {
+    property = "id"
+  }
+
+  /// The public floating IP address
+  hidden ip: FloatingIPResolvable = (this) {
+    property = "ip"
+  }
+}
+
+/// OVH Cloud Floating IP
+/// Creates a floating IP and attaches it to an instance.
+/// Path: POST /cloud/project/{serviceName}/region/{regionName}/instance/{instanceId}/floatingIp
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class FloatingIP extends formae.Resource {
+  /// Instance ID to attach the floating IP to.
+  /// Used in the URL path for creation.
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  instance_id: String|formae.Resolvable
+
+  /// Private IP address on the instance to associate the floating IP with.
+  /// This is the instance's private network IP, not the floating IP itself.
+  /// Can be a resolvable reference to the instance's network IP.
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  ip: String|formae.Resolvable
+
+  /// Optional gateway configuration if a gateway needs to be created.
+  @ovh.FieldHint {
+    required = false
+    createOnly = true
+  }
+  gateway: CreateGatewaySummary?
+
+  local parent = this
+
+  /// Provides resolvable references to this floating IP's properties
+  hidden res: FloatingIPResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}
+
+/// Parameters to create a gateway for the floating IP
+@ovh.SubResourceHint
+open class CreateGatewaySummary extends formae.SubResource {
+  /// Gateway model (e.g., "s", "m", "l")
+  model: String
+
+  /// Gateway name
+  name: String
+}

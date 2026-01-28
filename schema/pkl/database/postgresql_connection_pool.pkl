@@ -1,0 +1,91 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// OVH Database PostgreSQL Connection Pool
+/// Manages PgBouncer connection pools for PostgreSQL
+/// API: POST /cloud/project/{serviceName}/database/postgresql/{clusterId}/connectionPool
+module ovh.database.postgresql_connection_pool
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Database::PostgresqlConnectionPool"
+
+/// Connection pool mode
+/// - session: Server assigned for entire client session
+/// - transaction: Server assigned per transaction
+/// - statement: Server assigned per statement (most aggressive)
+typealias PoolMode = "session"|"transaction"|"statement"
+
+/// Resolvable reference to a PostgreSQL Connection Pool
+open class ConnectionPoolResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  hidden id: ConnectionPoolResolvable = (this) { property = "id" }
+
+  hidden name: ConnectionPoolResolvable = (this) { property = "name" }
+
+  hidden uri: ConnectionPoolResolvable = (this) { property = "uri" }
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class ConnectionPool extends formae.Resource {
+  hidden parent = this
+
+  /// Cloud project service name
+  @ovh.FieldHint { required = true; createOnly = true }
+  serviceName: String
+
+  /// PostgreSQL cluster ID
+  @ovh.FieldHint { required = true; createOnly = true }
+  clusterId: (String|formae.Resolvable)
+
+  /// Connection pool name
+  @ovh.FieldHint { required = true; createOnly = true }
+  name: String
+
+  /// Database ID this pool connects to
+  @ovh.FieldHint { required = true }
+  databaseId: (String|formae.Resolvable)
+
+  /// User ID for pool connections
+  @ovh.FieldHint { required = true }
+  userId: (String|formae.Resolvable)
+
+  /// Pool mode
+  @ovh.FieldHint { required = true }
+  mode: PoolMode
+
+  /// Maximum pool size
+  @ovh.FieldHint { required = true }
+  size: Int
+
+  // === Computed/Output fields ===
+
+  /// Connection pool ID
+  @ovh.FieldHint 
+  id: String?
+
+  /// Connection port
+  @ovh.FieldHint 
+  port: Int?
+
+  /// SSL mode
+  @ovh.FieldHint 
+  sslMode: String?
+
+  /// Connection URI
+  @ovh.FieldHint 
+  uri: String?
+
+  hidden res: ConnectionPoolResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}

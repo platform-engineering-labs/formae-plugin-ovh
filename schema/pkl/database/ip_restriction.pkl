@@ -1,0 +1,63 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// OVH Database IP Restriction
+/// Manages IP allowlist for database access
+/// API: POST /cloud/project/{serviceName}/database/{engine}/{clusterId}/ipRestriction
+module ovh.database.ip_restriction
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Database::IpRestriction"
+
+/// IP restriction status
+typealias IpRestrictionStatus = "CREATING"|"READY"|"PENDING"|"ERROR"|"DELETING"
+
+/// Resolvable reference to an IP Restriction
+open class IpRestrictionResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  hidden ip: IpRestrictionResolvable = (this) { property = "ip" }
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "ip"
+}
+open class IpRestriction extends formae.Resource {
+  hidden parent = this
+
+  /// Cloud project service name
+  @ovh.FieldHint { required = true; createOnly = true }
+  serviceName: String
+
+  /// Database engine type
+  @ovh.FieldHint { required = true; createOnly = true }
+  engine: String
+
+  /// Cluster/Service ID
+  @ovh.FieldHint { required = true; createOnly = true }
+  clusterId: (String|formae.Resolvable)
+
+  /// IP block in CIDR notation (e.g., "192.168.1.0/24" or "0.0.0.0/0")
+  @ovh.FieldHint { required = true; createOnly = true }
+  ip: String
+
+  /// Description of this IP restriction
+  description: String?
+
+  // === Computed/Output fields ===
+
+  /// IP restriction status
+  @ovh.FieldHint 
+  status: IpRestrictionStatus?
+
+  hidden res: IpRestrictionResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}

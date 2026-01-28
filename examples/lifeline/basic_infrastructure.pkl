@@ -1,0 +1,126 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+import "@formae/formae.pkl"
+
+import "./vars.pkl"
+
+import "./private_network_resources.pkl" as pn
+import "./network_resources.pkl" as nw
+import "./storage_resources.pkl" as storage
+
+import "@ovh/ovh.pkl"
+
+description {
+    text = """
+        OVH Lifeline - Comprehensive infrastructure example with private networks.
+
+        This forma creates foundational infrastructure on OVH Public Cloud:
+
+        **OpenStack Resources (via Neutron API):**
+        - Network (equivalent to AWS VPC)
+        - Subnet with DNS configuration
+        - Router with external gateway (equivalent to AWS IGW)
+
+        **OVH Native Resources (via OVH Cloud API):**
+        - Private Network with VLAN (OVH native networking)
+        - Private Subnet with DHCP allocation pool
+        - Swift Container (object storage)
+        - S3 Bucket (S3-compatible storage)
+
+        Total: 7 resources demonstrating both OpenStack and OVH native APIs.
+
+        **Region Handling:**
+        Specify region in OpenStack format (DE1, GRA7, BHS5, etc.).
+        Short region codes (DE, GRA, BHS) are auto-derived for S3 storage APIs.
+
+        **Prerequisites:**
+        Set the OVH_CLOUD_PROJECT_ID environment variable to your OVH Public Cloud project ID.
+        You can find this in the OVH Control Panel under Public Cloud > your project.
+
+        Apply this forma to create the infrastructure.
+        Make changes and reapply to update resources holistically.
+        Use the destroy command to remove all resources.
+        """
+    confirm = true
+}
+
+properties {
+    region = new formae.Prop {
+        flag = "region"
+        default = vars.defaultRegion
+    }
+
+    extNetID = new formae.Prop {
+        flag = "extNetID"
+        default = vars.defaultExtNetID
+    }
+
+    name = new formae.Prop {
+        flag = "name"
+        default = vars.projectName
+    }
+
+    // Private network CIDR (for OVH private network)
+    privateNetworkCidr = new formae.Prop {
+        flag = "privateNetworkCidr"
+        default = "192.168.0.0/24"
+    }
+
+    // OpenStack network CIDR
+    networkCidr = new formae.Prop {
+        flag = "networkCidr"
+        default = "10.0.0.0/16"
+    }
+
+    subnetCidr = new formae.Prop {
+        flag = "subnetCidr"
+        default = "10.0.1.0/24"
+    }
+}
+
+// OVH Private Network resources (native OVH API)
+local privateNetwork = new pn.PrivateNetworkResources {
+    name = properties.name.value
+    region = properties.region.value
+    networkCidr = properties.privateNetworkCidr.value
+}
+
+// OpenStack Network resources (Neutron API)
+local network = new nw.NetworkResources {
+    name = properties.name.value
+    networkCidr = properties.networkCidr.value
+    subnetCidr = properties.subnetCidr.value
+    extNetID = properties.extNetID.value
+}
+
+// Storage resources (object storage containers)
+// Region is specified as OpenStack format (DE1) - short form (DE) is auto-derived for S3 storage
+local storageRes = new storage.StorageResources {
+    name = properties.name.value
+    region = properties.region.value
+    projectId = vars.projectId
+}
+
+forma {
+    vars.stack
+
+    new formae.Target {
+        label = "ovh-target"
+        config = new ovh.Config {
+            projectId = vars.projectId
+            region = properties.region.value
+            // Credentials from environment:
+            // OVH API: OVH_ENDPOINT, OVH_APPLICATION_KEY, OVH_APPLICATION_SECRET, OVH_CONSUMER_KEY
+            // OpenStack: OS_AUTH_URL, OS_USERNAME, OS_PASSWORD, OS_PROJECT_ID, OS_USER_DOMAIN_NAME
+        }
+    }
+
+    ...network.resources
+    ...privateNetwork.resources
+    ...storageRes.resources
+}

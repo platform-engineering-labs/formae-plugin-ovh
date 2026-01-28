@@ -1,0 +1,71 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// OVH Database Kafka Topic
+/// API: POST /cloud/project/{serviceName}/database/kafka/{clusterId}/topic
+module ovh.database.kafka_topic
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Database::KafkaTopic"
+
+/// Resolvable reference to a Kafka Topic
+open class KafkaTopicResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  hidden id: KafkaTopicResolvable = (this) { property = "id" }
+
+  hidden name: KafkaTopicResolvable = (this) { property = "name" }
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class KafkaTopic extends formae.Resource {
+  hidden parent = this
+
+  /// Cloud project service name
+  @ovh.FieldHint { required = true; createOnly = true }
+  serviceName: String
+
+  /// Kafka cluster ID
+  @ovh.FieldHint { required = true; createOnly = true }
+  clusterId: (String|formae.Resolvable)
+
+  /// Topic name
+  @ovh.FieldHint { required = true; createOnly = true }
+  name: String
+
+  /// Number of partitions
+  @ovh.FieldHint { required = true }
+  partitions: Int
+
+  /// Replication factor
+  @ovh.FieldHint { required = true }
+  replication: Int
+
+  /// Minimum in-sync replicas required for writes
+  minInsyncReplicas: Int?
+
+  /// Retention period in hours (-1 for unlimited)
+  retentionHours: Int?
+
+  /// Retention size in bytes (-1 for unlimited)
+  retentionBytes: Int?
+
+  // === Computed/Output fields ===
+
+  /// Topic ID
+  @ovh.FieldHint 
+  id: String?
+
+  hidden res: KafkaTopicResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}

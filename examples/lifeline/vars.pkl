@@ -1,0 +1,28 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+import "@formae/formae.pkl"
+import "@ovh/ovh.pkl"
+
+// Project configuration
+projectName = "lifeline"
+stackName = "lifeline"
+
+// Default region for resources (can be overridden via environment)
+// Use OpenStack format (DE1, GRA7, etc.) - short form (DE, GRA) is auto-derived for storage APIs
+defaultRegion = "DE1"
+
+// OVH-provided pre-existing resources
+// Ext-Net is the public network provided by OVH for external connectivity
+// This ID is region-specific - adjust for your region
+defaultExtNetID = "ed0ab0c6-93ee-44f8-870b-d103065b1b34"
+
+projectId = read("env:OVH_CLOUD_PROJECT_ID")
+// Common stack definition
+stack: formae.Stack = new {
+    label = stackName
+    description = "OVH Lifeline - Demonstrates comprehensive infrastructure with private networks"
+}

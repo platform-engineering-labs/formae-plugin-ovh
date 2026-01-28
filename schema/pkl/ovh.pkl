@@ -1,0 +1,74 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module ovh
+
+import "@formae/formae.pkl"
+
+// OVH Cloud regions (for OpenStack API)
+typealias Region = "BHS5" |  // Beauharnois, Canada
+  "DE1" |                     // Frankfurt, Germany
+  "GRA7" |                    // Gravelines, France
+  "GRA9" |                    // Gravelines, France
+  "SBG5" |                    // Strasbourg, France
+  "UK1" |                     // London, UK
+  "WAW1" |                    // Warsaw, Poland
+  "US-EAST-VA-1"              // Virginia, USA
+
+// OVH API endpoints (for DNS and other OVH REST API resources)
+typealias OVHEndpoint = "ovh-eu" |      // Europe
+  "ovh-ca" |                             // Canada
+  "ovh-us" |                             // USA
+  "kimsufi-eu" |                         // Kimsufi Europe
+  "kimsufi-ca" |                         // Kimsufi Canada
+  "soyoustart-eu" |                      // SoYouStart Europe
+  "soyoustart-ca"                        // SoYouStart Canada
+
+/// OVH target configuration
+/// Fields can be set directly or read from environment variables in resource schemas.
+open class Config {
+  hidden fixed type: String = "OVH"
+
+  // === OVH REST API fields ===
+
+  /// OVH API endpoint for DNS and domain resources
+  hidden ovhEndpoint: (OVHEndpoint|String)?
+
+  /// OVH application key
+  hidden applicationKey: String?
+
+  /// OVH application secret
+  hidden applicationSecret: String?
+
+  /// OVH consumer key
+  hidden consumerKey: String?
+
+  /// Default region for regional resources (e.g., DE1, GRA7, BHS5)
+  hidden region: (Region|String)?
+
+  /// OVH Cloud project ID (also known as serviceName)
+  /// Required for cloud resources (instances, networks, etc.)
+  hidden projectId: String?
+
+  // Exported fields to target config
+  fixed Type: String = type
+  fixed OVHEndpoint: (OVHEndpoint|String)? = ovhEndpoint
+  fixed ApplicationKey: String? = applicationKey
+  fixed ApplicationSecret: String? = applicationSecret
+  fixed ConsumerKey: String? = consumerKey
+  fixed Region: (Region|String)? = region
+  fixed ProjectId: String? = projectId
+}
+
+class FieldHint extends formae.FieldHint {}
+
+class ResourceHint extends formae.ResourceHint {
+  hidden outputKeyTransformation: (String) -> String = (it) -> it
+}
+
+class SubResourceHint extends formae.SubResourceHint {
+  hidden outputKeyTransformation: (String) -> String = (it) -> it
+}

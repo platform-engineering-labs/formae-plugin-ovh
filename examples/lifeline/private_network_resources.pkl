@@ -1,0 +1,46 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+import "@formae/formae.pkl"
+import "@ovh/network/privatenetwork.pkl"
+import "@ovh/network/privatesubnet.pkl"
+
+/// OVH Private Network Resources
+/// These use the OVH Cloud API (not OpenStack) for native private networking
+class PrivateNetworkResources {
+    name: String
+    region: String
+    networkCidr: String
+
+    /// Private network using OVH Cloud API
+    /// This creates a VLAN-backed private network across OVH regions
+    hidden privateNetwork: privatenetwork.PrivateNetwork = new {
+        label = "lifeline-private-network"
+        name = outer.name + "-private"
+        regions {
+            region
+        }
+        vlanId = 100
+    }
+
+    /// Private subnet within the OVH private network
+    /// This configures DHCP and IP allocation for the private network
+    hidden privateSubnet: privatesubnet.PrivateSubnet = new {
+        label = "lifeline-private-subnet"
+        region = outer.region
+        network_id = privateNetwork.res.id
+        network = networkCidr
+        dhcp = true
+        noGateway = false
+        start = networkCidr.replaceFirst(".0/24", ".10")
+        end = networkCidr.replaceFirst(".0/24", ".250")
+    }
+
+    hidden resources: Listing<formae.Resource> = new {
+        privateNetwork
+        privateSubnet
+    }
+}

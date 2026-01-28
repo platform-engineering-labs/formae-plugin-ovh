@@ -1,0 +1,31 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@ovh/compute/instance.pkl"
+
+import "./vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  // Replace the instance - change CreateOnly property (flavorId)
+  new instance.Instance {
+    label = "plugin-sdk-test-instance"
+    name = "formae-plugin-sdk-test-\(v.testRunID)-replaced"
+    flavorId = v.replacementFlavorID // CreateOnly change forces replacement
+    imageId = v.ubuntuImageID // No change
+    region = v.region
+    networks = new Listing {
+      // Public network (Ext-Net) - pre-existing OVH resource
+      new instance.NetworkParams {
+        networkId = v.extNetID
+      }
+    }
+  }
+}

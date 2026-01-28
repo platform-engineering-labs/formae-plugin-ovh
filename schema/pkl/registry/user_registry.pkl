@@ -1,0 +1,68 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// OVH Container Registry User
+/// API: POST /cloud/project/{serviceName}/containerRegistry/{registryId}/users
+module ovh.registry.user
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Registry::User"
+
+/// Resolvable reference to a Registry User
+open class UserResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  hidden id: UserResolvable = (this) { property = "id" }
+
+  hidden user: UserResolvable = (this) { property = "user" }
+
+  hidden password: UserResolvable = (this) { property = "password" }
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class User extends formae.Resource {
+  hidden parent = this
+
+  /// Cloud project service name (project ID)
+  @ovh.FieldHint { required = true; createOnly = true }
+  serviceName: String
+
+  /// Registry ID
+  @ovh.FieldHint { required = true; createOnly = true }
+  registryId: (String|formae.Resolvable)
+
+  /// User login name
+  @ovh.FieldHint { required = true; createOnly = true }
+  login: String
+
+  /// User email
+  @ovh.FieldHint { required = true; createOnly = true }
+  email: String
+
+  // === Computed/Output fields ===
+
+  /// User ID
+  @ovh.FieldHint 
+  id: String?
+
+  /// Username (same as login)
+  @ovh.FieldHint 
+  user: String?
+
+  /// Generated password (only returned on creation)
+  @ovh.FieldHint 
+  password: String?
+
+  hidden res: UserResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}

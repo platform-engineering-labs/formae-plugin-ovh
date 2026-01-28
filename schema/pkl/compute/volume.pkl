@@ -1,0 +1,78 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module volume
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Compute::Volume"
+
+/// Resolvable reference to a Volume resource
+/// Use this to reference a volume's properties in dependent resources
+open class VolumeResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  /// The volume's unique identifier
+  hidden id: VolumeResolvable = (this) {
+    property = "id"
+  }
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class Volume extends formae.Resource {
+  @ovh.FieldHint {
+    required = true
+  }
+  name: String
+
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  size: Int
+
+  @ovh.FieldHint {
+    required = true
+    createOnly = true
+  }
+  region: String
+
+  @ovh.FieldHint {
+    createOnly = true
+  }
+  volumeType: String?
+
+  description: String?
+
+  @ovh.FieldHint {
+    createOnly = true
+  }
+  imageId: String?
+
+  @ovh.FieldHint {
+    createOnly = true
+  }
+  snapshotId: String?
+
+  // Computed fields (not user-provided)
+  // id: String
+  // status: String
+  // createdAt: String
+  // attachedTo: Listing<String>
+  // bootable: Boolean
+
+  local parent = this
+
+  /// Provides resolvable references to this volume's properties
+  hidden res: VolumeResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}

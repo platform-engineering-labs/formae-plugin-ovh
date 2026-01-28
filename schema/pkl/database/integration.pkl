@@ -1,0 +1,77 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// OVH Database Integration
+/// Connects database services together (e.g., Kafka to OpenSearch)
+/// API: POST /cloud/project/{serviceName}/database/{engine}/{clusterId}/integration
+module ovh.database.integration
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Database::Integration"
+
+/// Integration types
+typealias IntegrationType = "grafanaDashboard"|"grafanaDatasource"|"kafkaConnect"|"kafkaLogs"|"kafkaMirrorMaker"|"m3aggregator"|"m3dbMetrics"|"opensearchLogs"|"postgresqlLogs"
+
+/// Integration status
+typealias IntegrationStatus = "CREATING"|"READY"|"PENDING"|"ERROR"|"DELETING"
+
+/// Resolvable reference to a Database Integration
+open class IntegrationResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  hidden id: IntegrationResolvable = (this) { property = "id" }
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class Integration extends formae.Resource {
+  hidden parent = this
+
+  /// Cloud project service name
+  @ovh.FieldHint { required = true; createOnly = true }
+  serviceName: String
+
+  /// Database engine type of source service
+  @ovh.FieldHint { required = true; createOnly = true }
+  engine: String
+
+  /// Source cluster/service ID
+  @ovh.FieldHint { required = true; createOnly = true }
+  clusterId: (String|formae.Resolvable)
+
+  /// Integration type
+  @ovh.FieldHint { required = true; createOnly = true }
+  type: IntegrationType
+
+  /// Destination service ID
+  @ovh.FieldHint { required = true; createOnly = true }
+  destinationServiceId: (String|formae.Resolvable)
+
+  /// Source service ID (if different from clusterId)
+  sourceServiceId: (String|formae.Resolvable)?
+
+  /// Integration-specific parameters
+  parameters: Mapping<String, String>?
+
+  // === Computed/Output fields ===
+
+  /// Integration ID
+  @ovh.FieldHint
+  id: String?
+
+  /// Integration status
+  @ovh.FieldHint
+  status: IntegrationStatus?
+
+  hidden res: IntegrationResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}
