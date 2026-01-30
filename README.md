@@ -1,6 +1,7 @@
 # OVH Cloud Plugin for Formae
 
-[![CI](https://github.com/platform-engineering-labs/formae-plugin-ovh/actions/workflows/ci.yml/badge.svg)](https://github.com/platform-engineering-labs/formae-plugin-ovh/actions/workflows/ci.yml)
+[![CI](https://github.com/platform-engineering-labs/formae-plugin-ovh/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/platform-engineering-labs/formae-plugin-ovh/actions/workflows/ci.yml)
+[![Nightly](https://github.com/platform-engineering-labs/formae-plugin-ovh/actions/workflows/nightly.yml/badge.svg?branch=main)](https://github.com/platform-engineering-labs/formae-plugin-ovh/actions/workflows/nightly.yml)
 
 OVH Cloud resource plugin for [Formae](https://github.com/platform-engineering-labs/formae). This plugin enables Formae to manage OVH Public Cloud resources using the OpenStack APIs via [gophercloud](https://github.com/gophercloud/gophercloud).
 
