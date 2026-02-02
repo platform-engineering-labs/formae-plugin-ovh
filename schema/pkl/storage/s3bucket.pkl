@@ -114,10 +114,6 @@ open class Replication extends formae.SubResource {
 open class S3Bucket extends formae.Resource {
   hidden parent = this
 
-  /// Region where the bucket is located
-  @ovh.FieldHint { required = true; createOnly = true }
-  region: String
-
   /// Bucket name (must be globally unique)
   @ovh.FieldHint { required = true; createOnly = true }
   name: String

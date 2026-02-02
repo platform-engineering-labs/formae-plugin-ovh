@@ -14,10 +14,8 @@ forma {
   v.stack
   v.target
 
-  // Replace the S3 bucket - change CreateOnly property (name)
   new s3bucket.S3Bucket {
     label = "plugin-sdk-test-s3bucket"
-    region = v.region // CreateOnly, no change
     name = "formae-test-bucket-\(v.testRunID)-replaced" // CreateOnly change forces replacement
     encryption = new s3bucket.Encryption {
       sseAlgorithm = "AES256"

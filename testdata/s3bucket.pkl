@@ -14,10 +14,8 @@ forma {
   v.stack
   v.target
 
-  // Create an S3 bucket with basic configuration
   new s3bucket.S3Bucket {
     label = "plugin-sdk-test-s3bucket"
-    region = v.region
     name = "formae-test-bucket-\(v.testRunID)"
     encryption = new s3bucket.Encryption {
       sseAlgorithm = "AES256"
