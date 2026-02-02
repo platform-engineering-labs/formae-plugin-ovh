@@ -14,7 +14,6 @@ import (
 	"github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/prov"
 	"github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/registry"
 	ovhtransport "github.com/platform-engineering-labs/formae-plugin-ovh/pkg/transport/ovh"
-	"github.com/platform-engineering-labs/formae/pkg/plugin"
 	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
@@ -71,10 +70,17 @@ func (p *s3BucketProvisioner) Create(ctx context.Context, request *resource.Crea
 		return s3HandleTransportError(err), nil
 	}
 
-	// Native ID: project/region/name (uses short region for consistency)
+	// Native ID: project/shortRegion/name (uses short region to match OVH API)
 	nativeID := fmt.Sprintf("%s/%s/%s", project, shortRegion, name)
 
-	propsJSON, _ := json.Marshal(response.Body)
+	// Preserve original region in response (API returns short region, but user specified full region)
+	responseProps := response.Body
+	if responseProps == nil {
+		responseProps = make(map[string]interface{})
+	}
+	responseProps["region"] = region
+
+	propsJSON, _ := json.Marshal(responseProps)
 
 	return &resource.CreateResult{
 		ProgressResult: &resource.ProgressResult{
@@ -87,18 +93,14 @@ func (p *s3BucketProvisioner) Create(ctx context.Context, request *resource.Crea
 }
 
 func (p *s3BucketProvisioner) Read(ctx context.Context, request *resource.ReadRequest) (*resource.ReadResult, error) {
-	log := plugin.LoggerFromContext(ctx)
-
-	log.Info("S3Bucket Read: starting", "nativeID", request.NativeID)
-
 	project, region, name, err := parseS3NativeID(request.NativeID)
 	if err != nil {
-		log.Warn("S3Bucket Read: failed to parse nativeID", "nativeID", request.NativeID, "error", err)
 		return &resource.ReadResult{ErrorCode: resource.OperationErrorCodeInvalidRequest}, nil
 	}
 
-	url := fmt.Sprintf("/cloud/project/%s/region/%s/storage/%s", project, region, name)
-	log.Info("S3Bucket Read: calling API", "url", url, "project", project, "region", region, "name", name)
+	// Derive short region for API call (native ID preserves original region)
+	shortRegion := base.DeriveShortRegion(region)
+	url := fmt.Sprintf("/cloud/project/%s/region/%s/storage/%s", project, shortRegion, name)
 
 	response, err := p.client.Do(ctx, ovhtransport.RequestOptions{
 		Method: "GET",
@@ -113,7 +115,19 @@ func (p *s3BucketProvisioner) Read(ctx context.Context, request *resource.ReadRe
 		return &resource.ReadResult{ErrorCode: resource.OperationErrorCodeServiceInternalError}, nil
 	}
 
-	propsJSON, _ := json.Marshal(response.Body)
+	// Preserve original region in response
+	responseProps := response.Body
+	if responseProps == nil {
+		responseProps = make(map[string]interface{})
+	}
+	responseProps["region"] = region
+
+	// Ensure versioning is present in response for proper diff detection
+	if _, hasVersioning := responseProps["versioning"]; !hasVersioning {
+		responseProps["versioning"] = map[string]interface{}{"status": "suspended"}
+	}
+
+	propsJSON, _ := json.Marshal(responseProps)
 	return &resource.ReadResult{Properties: string(propsJSON)}, nil
 }
 
@@ -129,7 +143,9 @@ func (p *s3BucketProvisioner) Update(ctx context.Context, request *resource.Upda
 		return s3UpdateFailure(request.NativeID, resource.OperationErrorCodeInvalidRequest, err.Error()), nil
 	}
 
-	url := fmt.Sprintf("/cloud/project/%s/region/%s/storage/%s", project, region, name)
+	// Derive short region for API call (native ID preserves original region)
+	shortRegion := base.DeriveShortRegion(region)
+	url := fmt.Sprintf("/cloud/project/%s/region/%s/storage/%s", project, shortRegion, name)
 
 	// Strip immutable fields
 	body := s3FilterProps(props, "serviceName", "region", "name", "ownerId", "objectLock")
@@ -147,7 +163,14 @@ func (p *s3BucketProvisioner) Update(ctx context.Context, request *resource.Upda
 		return s3UpdateFailure(request.NativeID, resource.OperationErrorCodeServiceInternalError, err.Error()), nil
 	}
 
-	propsJSON, _ := json.Marshal(response.Body)
+	// Preserve original region in response
+	responseProps := response.Body
+	if responseProps == nil {
+		responseProps = make(map[string]interface{})
+	}
+	responseProps["region"] = region
+
+	propsJSON, _ := json.Marshal(responseProps)
 
 	return &resource.UpdateResult{
 		ProgressResult: &resource.ProgressResult{
@@ -165,7 +188,9 @@ func (p *s3BucketProvisioner) Delete(ctx context.Context, request *resource.Dele
 		return s3DeleteFailure(request.NativeID, resource.OperationErrorCodeInvalidRequest, err.Error()), nil
 	}
 
-	url := fmt.Sprintf("/cloud/project/%s/region/%s/storage/%s", project, region, name)
+	// Derive short region for API call (native ID preserves original region)
+	shortRegion := base.DeriveShortRegion(region)
+	url := fmt.Sprintf("/cloud/project/%s/region/%s/storage/%s", project, shortRegion, name)
 
 	_, err = p.client.Do(ctx, ovhtransport.RequestOptions{
 		Method: "DELETE",
@@ -198,19 +223,13 @@ func (p *s3BucketProvisioner) Delete(ctx context.Context, request *resource.Dele
 }
 
 func (p *s3BucketProvisioner) List(ctx context.Context, request *resource.ListRequest) (*resource.ListResult, error) {
-	log := plugin.LoggerFromContext(ctx)
-
 	project := s3ExtractProjectFromAdditional(request.TargetConfig, request.AdditionalProperties)
 	if project == "" {
-		log.Warn("S3Bucket List: serviceName/projectId not found in AdditionalProperties or TargetConfig",
-			"additionalProperties", request.AdditionalProperties)
 		return &resource.ListResult{NativeIDs: nil}, nil
 	}
 
 	region := s3ExtractRegion(request.TargetConfig, request.AdditionalProperties)
 	if region == "" {
-		log.Warn("S3Bucket List: region not found in AdditionalProperties or TargetConfig",
-			"additionalProperties", request.AdditionalProperties)
 		return &resource.ListResult{NativeIDs: nil}, nil
 	}
 
@@ -218,7 +237,6 @@ func (p *s3BucketProvisioner) List(ctx context.Context, request *resource.ListRe
 	shortRegion := base.DeriveShortRegion(region)
 
 	url := fmt.Sprintf("/cloud/project/%s/region/%s/storage", project, shortRegion)
-	log.Info("S3Bucket List: calling API", "url", url, "project", project, "region", shortRegion)
 	response, err := p.client.Do(ctx, ovhtransport.RequestOptions{
 		Method: "GET",
 		Path:   url,
@@ -227,6 +245,7 @@ func (p *s3BucketProvisioner) List(ctx context.Context, request *resource.ListRe
 		return nil, fmt.Errorf("failed to list S3 buckets: %w", err)
 	}
 
+	// Native IDs use short region to match OVH API
 	var nativeIDs []string
 	for _, item := range response.BodyArray {
 		if bucket, ok := item.(map[string]interface{}); ok {
@@ -246,7 +265,9 @@ func (p *s3BucketProvisioner) Status(ctx context.Context, request *resource.Stat
 		return s3StatusFailure(request, resource.OperationErrorCodeInvalidRequest, err.Error()), nil
 	}
 
-	url := fmt.Sprintf("/cloud/project/%s/region/%s/storage/%s", project, region, name)
+	// Derive short region for API call (native ID preserves original region)
+	shortRegion := base.DeriveShortRegion(region)
+	url := fmt.Sprintf("/cloud/project/%s/region/%s/storage/%s", project, shortRegion, name)
 
 	response, err := p.client.Do(ctx, ovhtransport.RequestOptions{
 		Method: "GET",
@@ -260,7 +281,14 @@ func (p *s3BucketProvisioner) Status(ctx context.Context, request *resource.Stat
 		return s3StatusFailure(request, resource.OperationErrorCodeServiceInternalError, err.Error()), nil
 	}
 
-	propsJSON, _ := json.Marshal(response.Body)
+	// Preserve original region in response
+	responseProps := response.Body
+	if responseProps == nil {
+		responseProps = make(map[string]interface{})
+	}
+	responseProps["region"] = region
+
+	propsJSON, _ := json.Marshal(responseProps)
 
 	return &resource.StatusResult{
 		ProgressResult: &resource.ProgressResult{
