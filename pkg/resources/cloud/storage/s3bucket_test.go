@@ -307,15 +307,30 @@ func TestS3Bucket_List_Integration(t *testing.T) {
 	// The created bucket should be in the list
 	found := false
 	for _, id := range listResult.NativeIDs {
+		// Read each bucket to verify it exists and is accessible
+		readReq := &resource.ReadRequest{
+			ResourceType: S3BucketResourceType,
+			NativeID:     id,
+			TargetConfig: testTargetConfig,
+		}
+		readResult, err := provisioner.Read(ctx, readReq)
+		require.NoError(t, err, "Read should not return an error for bucket: %s", id)
+		require.NotNil(t, readResult, "ReadResult should not be nil for bucket: %s", id)
+		assert.Empty(t, readResult.ErrorCode, "ErrorCode should be empty for bucket: %s", id)
+
+		var props map[string]interface{}
+		err = json.Unmarshal([]byte(readResult.Properties), &props)
+		require.NoError(t, err, "Should be able to unmarshal properties for bucket: %s", id)
+		t.Logf("  Read bucket: %s (name: %v)", id, props["name"])
+
 		if id == nativeID {
 			found = true
-			break
 		}
 	}
 	assert.True(t, found, "Created S3 bucket should be in the list. NativeID: %s, List: %v",
 		nativeID, listResult.NativeIDs)
 
-	t.Logf("✓ List returned %d S3 buckets, including test bucket", len(listResult.NativeIDs))
+	t.Logf("✓ List returned %d S3 buckets, all readable, including test bucket", len(listResult.NativeIDs))
 }
 
 func TestS3Bucket_CreateWithVersioning_Integration(t *testing.T) {
