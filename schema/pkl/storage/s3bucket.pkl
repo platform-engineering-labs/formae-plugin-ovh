@@ -17,7 +17,7 @@ const type = "OVH::Storage::S3Bucket"
 typealias VersioningStatus = "disabled"|"enabled"|"suspended"
 
 /// Encryption algorithm for S3 bucket
-typealias EncryptionAlgorithm = "AES256"|"aws:kms"
+typealias EncryptionAlgorithm = "AES256"|"aws:kms"|"plaintext"
 
 /// Resolvable reference to an S3 Bucket
 open class S3BucketResolvable extends formae.Resolvable {
@@ -113,10 +113,6 @@ open class Replication extends formae.SubResource {
 }
 open class S3Bucket extends formae.Resource {
   hidden parent = this
-
-  /// Cloud project service name (project ID)
-  @ovh.FieldHint { required = true; createOnly = true }
-  serviceName: String
 
   /// Region where the bucket is located
   @ovh.FieldHint { required = true; createOnly = true }

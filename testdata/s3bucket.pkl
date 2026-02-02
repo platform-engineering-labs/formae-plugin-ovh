@@ -1,0 +1,26 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@ovh/storage/s3bucket.pkl"
+
+import "./vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  // Create an S3 bucket with basic configuration
+  new s3bucket.S3Bucket {
+    label = "plugin-sdk-test-s3bucket"
+    region = v.region
+    name = "formae-test-bucket-\(v.testRunID)"
+    encryption = new s3bucket.Encryption {
+      sseAlgorithm = "AES256"
+    }
+  }
+}

@@ -10,11 +10,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 	"github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/base"
 	"github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/prov"
 	"github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/registry"
 	ovhtransport "github.com/platform-engineering-labs/formae-plugin-ovh/pkg/transport/ovh"
+	"github.com/platform-engineering-labs/formae/pkg/plugin"
+	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
 // S3BucketResourceType is the resource type for S3-compatible storage buckets.
@@ -40,7 +41,7 @@ func (p *s3BucketProvisioner) Create(ctx context.Context, request *resource.Crea
 			"serviceName is required"), nil
 	}
 
-	region, _ := props["region"].(string)
+	region := s3ExtractRegionFromProps(request.TargetConfig, props)
 	if region == "" {
 		return s3CreateFailure(resource.OperationErrorCodeInvalidRequest,
 			"region is required"), nil
@@ -86,12 +87,18 @@ func (p *s3BucketProvisioner) Create(ctx context.Context, request *resource.Crea
 }
 
 func (p *s3BucketProvisioner) Read(ctx context.Context, request *resource.ReadRequest) (*resource.ReadResult, error) {
+	log := plugin.LoggerFromContext(ctx)
+
+	log.Info("S3Bucket Read: starting", "nativeID", request.NativeID)
+
 	project, region, name, err := parseS3NativeID(request.NativeID)
 	if err != nil {
+		log.Warn("S3Bucket Read: failed to parse nativeID", "nativeID", request.NativeID, "error", err)
 		return &resource.ReadResult{ErrorCode: resource.OperationErrorCodeInvalidRequest}, nil
 	}
 
 	url := fmt.Sprintf("/cloud/project/%s/region/%s/storage/%s", project, region, name)
+	log.Info("S3Bucket Read: calling API", "url", url, "project", project, "region", region, "name", name)
 
 	response, err := p.client.Do(ctx, ovhtransport.RequestOptions{
 		Method: "GET",
@@ -191,14 +198,19 @@ func (p *s3BucketProvisioner) Delete(ctx context.Context, request *resource.Dele
 }
 
 func (p *s3BucketProvisioner) List(ctx context.Context, request *resource.ListRequest) (*resource.ListResult, error) {
+	log := plugin.LoggerFromContext(ctx)
+
 	project := s3ExtractProjectFromAdditional(request.TargetConfig, request.AdditionalProperties)
 	if project == "" {
+		log.Warn("S3Bucket List: serviceName/projectId not found in AdditionalProperties or TargetConfig",
+			"additionalProperties", request.AdditionalProperties)
 		return &resource.ListResult{NativeIDs: nil}, nil
 	}
 
-	region := request.AdditionalProperties["region"]
+	region := s3ExtractRegion(request.TargetConfig, request.AdditionalProperties)
 	if region == "" {
-		// Region is required for listing S3 buckets
+		log.Warn("S3Bucket List: region not found in AdditionalProperties or TargetConfig",
+			"additionalProperties", request.AdditionalProperties)
 		return &resource.ListResult{NativeIDs: nil}, nil
 	}
 
@@ -206,7 +218,7 @@ func (p *s3BucketProvisioner) List(ctx context.Context, request *resource.ListRe
 	shortRegion := base.DeriveShortRegion(region)
 
 	url := fmt.Sprintf("/cloud/project/%s/region/%s/storage", project, shortRegion)
-
+	log.Info("S3Bucket List: calling API", "url", url, "project", project, "region", shortRegion)
 	response, err := p.client.Do(ctx, ovhtransport.RequestOptions{
 		Method: "GET",
 		Path:   url,
@@ -303,6 +315,48 @@ func s3ExtractProjectFromAdditional(targetConfig json.RawMessage, additionalProp
 
 	projectFields := []string{"ProjectId", "projectId", "ServiceName", "serviceName"}
 	for _, field := range projectFields {
+		if val, ok := cfg[field].(string); ok && val != "" {
+			return val
+		}
+	}
+	return ""
+}
+
+func s3ExtractRegion(targetConfig json.RawMessage, additionalProps map[string]string) string {
+	// Try additional props first
+	if region, ok := additionalProps["region"]; ok && region != "" {
+		return region
+	}
+
+	// Try target config
+	var cfg map[string]interface{}
+	if err := json.Unmarshal(targetConfig, &cfg); err != nil {
+		return ""
+	}
+
+	regionFields := []string{"Region", "region"}
+	for _, field := range regionFields {
+		if val, ok := cfg[field].(string); ok && val != "" {
+			return val
+		}
+	}
+	return ""
+}
+
+func s3ExtractRegionFromProps(targetConfig json.RawMessage, props map[string]interface{}) string {
+	// Try props first
+	if region, ok := props["region"].(string); ok && region != "" {
+		return region
+	}
+
+	// Try target config
+	var cfg map[string]interface{}
+	if err := json.Unmarshal(targetConfig, &cfg); err != nil {
+		return ""
+	}
+
+	regionFields := []string{"Region", "region"}
+	for _, field := range regionFields {
 		if val, ok := cfg[field].(string); ok && val != "" {
 			return val
 		}

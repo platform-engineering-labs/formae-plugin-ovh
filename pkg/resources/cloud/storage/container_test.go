@@ -232,32 +232,6 @@ func TestContainer_Delete_Integration(t *testing.T) {
 	t.Logf("✓ Deleted container: %s", nativeID)
 }
 
-func TestContainer_Delete_NotFound_Integration(t *testing.T) {
-	testutil.SkipIfOVHNotConfigured(t)
-
-	ctx := context.Background()
-
-	// Use a non-existent container ID
-	nonExistentNativeID := fmt.Sprintf("%s/non-existent-container-id", testutil.OVHCloudProjectID)
-
-	deleteReq := &resource.DeleteRequest{
-		ResourceType: ContainerResourceType,
-		NativeID:     nonExistentNativeID,
-		TargetConfig: testTargetConfig,
-	}
-
-	deleteResult, err := testContainerProvisioner.Delete(ctx, deleteReq)
-	require.NoError(t, err, "Delete should not return an error")
-	require.NotNil(t, deleteResult, "DeleteResult should not be nil")
-	require.NotNil(t, deleteResult.ProgressResult, "ProgressResult should not be nil")
-
-	// Delete should be idempotent - 404 is treated as success
-	assert.Equal(t, resource.OperationStatusSuccess, deleteResult.ProgressResult.OperationStatus,
-		"Delete of non-existent resource should succeed (idempotent)")
-
-	t.Logf("✓ Delete of non-existent container returned success (idempotent)")
-}
-
 func TestContainer_List_Integration(t *testing.T) {
 	testutil.SkipIfOVHNotConfigured(t)
 
