@@ -549,8 +549,14 @@ func (b *BaseResource) Status(ctx context.Context, request *resource.StatusReque
 		}, nil
 	}
 
-	// Resource is ready
-	propsJSON, _ := json.Marshal(response.Body)
+	// Resource is ready - apply response transformer if configured
+	responseProps := response.Body
+	if b.ResponseTransformer != nil {
+		transformCtx := b.buildTransformContext(ctx, pathCtx, resource.OperationCheckStatus)
+		responseProps = b.ResponseTransformer.Transform(responseProps, transformCtx)
+	}
+
+	propsJSON, _ := json.Marshal(responseProps)
 	return &resource.StatusResult{
 		ProgressResult: &resource.ProgressResult{
 			Operation:          resource.OperationCheckStatus,
