@@ -17,12 +17,14 @@ forma {
 
   // Define the private network that this subnet belongs to
   // Must specify region to ensure it's activated before subnet creation
+  // Use vlanId 200 to avoid conflicts with instance test (uses 100) and stale resources (use 0)
   local testNetwork = new privatenetwork.PrivateNetwork {
     label = "plugin-sdk-test-network"
     name = "formae-plugin-sdk-test-network-\(v.testRunID)"
     regions {
       v.region
     }
+    vlanId = 200
   }
   testNetwork
 
