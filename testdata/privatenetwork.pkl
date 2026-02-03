@@ -8,7 +8,7 @@ amends "@formae/forma.pkl"
 
 import "@ovh/network/privatenetwork.pkl"
 
-import "./vars.pkl" as v
+import "./config/vars.pkl" as v
 
 forma {
   v.stack
