@@ -90,23 +90,24 @@ clean-environment:
 	@./scripts/ci/clean-environment.sh
 
 ## conformance-test: Run all conformance tests (CRUD + discovery)
-## Usage: make conformance-test [VERSION=0.80.0] [TEST=s3-bucket]
+## Usage: make conformance-test [VERSION=0.80.0] [TEST=s3-bucket] [TIMEOUT=15]
 ## Downloads the specified formae version (or latest) and runs conformance tests.
 ## Calls setup-credentials and clean-environment automatically.
 ##
 ## Parameters:
 ##   VERSION - Formae version to test against (default: latest)
 ##   TEST    - Filter tests by name pattern (e.g., TEST=s3-bucket)
+##   TIMEOUT - Timeout in minutes for long-running operations (default: 5)
 conformance-test: conformance-test-crud conformance-test-discovery
 
 ## conformance-test-crud: Run only CRUD lifecycle tests
-## Usage: make conformance-test-crud [VERSION=0.80.0] [TEST=s3-bucket]
+## Usage: make conformance-test-crud [VERSION=0.80.0] [TEST=s3-bucket] [TIMEOUT=15]
 conformance-test-crud: install setup-credentials
 	@echo "Pre-test cleanup..."
 	@./scripts/ci/clean-environment.sh || true
 	@echo ""
 	@echo "Running CRUD conformance tests..."
-	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=crud ./scripts/run-conformance-tests.sh $(VERSION); \
+	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=crud FORMAE_TEST_TIMEOUT="$(TIMEOUT)" ./scripts/run-conformance-tests.sh $(VERSION); \
 	TEST_EXIT=$$?; \
 	echo ""; \
 	echo "Post-test cleanup..."; \
@@ -114,13 +115,13 @@ conformance-test-crud: install setup-credentials
 	exit $$TEST_EXIT
 
 ## conformance-test-discovery: Run only discovery tests
-## Usage: make conformance-test-discovery [VERSION=0.80.0] [TEST=s3-bucket]
+## Usage: make conformance-test-discovery [VERSION=0.80.0] [TEST=s3-bucket] [TIMEOUT=15]
 conformance-test-discovery: install setup-credentials
 	@echo "Pre-test cleanup..."
 	@./scripts/ci/clean-environment.sh || true
 	@echo ""
 	@echo "Running discovery conformance tests..."
-	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=discovery ./scripts/run-conformance-tests.sh $(VERSION); \
+	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=discovery FORMAE_TEST_TIMEOUT="$(TIMEOUT)" ./scripts/run-conformance-tests.sh $(VERSION); \
 	TEST_EXIT=$$?; \
 	echo ""; \
 	echo "Post-test cleanup..."; \
