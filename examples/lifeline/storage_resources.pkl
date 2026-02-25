@@ -27,10 +27,7 @@ class StorageResources {
     /// Archive container for backups and long-term storage
     hidden archiveContainer: s3bucket.S3Bucket = new {
         label = "lifeline-s3-container"
-        serviceName = outer.projectId
         name = outer.name + "-s3"
-        region = outer.region
-
     }
 
     hidden resources: Listing<formae.Resource> = new {
