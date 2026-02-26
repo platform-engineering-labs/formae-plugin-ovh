@@ -104,10 +104,30 @@ export OVH_CLOUD_PROJECT_ID="your-project-id"
 ```
 
 **Getting OVH API Credentials:**
-1. Go to [OVH API Token Creation](https://eu.api.ovh.com/createToken/) (use appropriate region)
-2. Create an application with the required permissions
-3. Note the Application Key, Application Secret, and Consumer Key
-4. Find your Cloud Project ID in the [OVH Control Panel](https://www.ovh.com/manager/) under Public Cloud
+
+| Region | Create Application | Create Token |
+|--------|--------------------|-------------|
+| EU | https://eu.api.ovh.com/createApp/ | https://eu.api.ovh.com/createToken/ |
+| US | https://api.us.ovhcloud.com/createApp/ | https://api.us.ovhcloud.com/createToken/ |
+| CA | https://ca.api.ovh.com/createApp/ | https://ca.api.ovh.com/createToken/ |
+
+1. **Create an application** at the `/createApp/` URL for your region — note the Application Key and Secret
+2. **Request a consumer key** using the API (the `/createToken/` web UI may not work for all account types):
+   ```bash
+   curl -X POST "https://eu.api.ovh.com/1.0/auth/credential" \
+     -H "X-Ovh-Application: YOUR_APP_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"accessRules":[{"method":"GET","path":"/*"},{"method":"POST","path":"/*"},{"method":"PUT","path":"/*"},{"method":"DELETE","path":"/*"}]}'
+   ```
+   For US, replace the URL with `https://api.us.ovhcloud.com/1.0/auth/credential`.
+
+   This returns a `consumerKey` and a `validationUrl`.
+3. **Validate the consumer key** by opening the `validationUrl` in your browser and approving access. The consumer key will not work until validated.
+4. Find your Cloud Project ID in the OVH Control Panel under Public Cloud:
+   - EU: https://www.ovh.com/manager/
+   - US: https://us.ovhcloud.com/manager/
+
+> **Note:** Accounts are region-specific. EU credentials do not work on the US endpoint and vice versa. You must create the application and token on the same regional endpoint.
 
 #### OpenStack API Credentials
 
@@ -172,7 +192,14 @@ Run the full CRUD lifecycle + discovery tests:
 
 ```bash
 make conformance-test                  # Latest formae version
-make conformance-test   # Specific version
+make conformance-test VERSION=0.82.1   # Specific version
+make conformance-test TEST=privatesubnet  # Filter by resource name
+```
+
+To skip the formae binary download (useful for slow connections or local development), set `FORMAE_BINARY` to point at a local build:
+
+```bash
+FORMAE_BINARY=/path/to/formae/bin/formae make conformance-test TEST=privatesubnet
 ```
 
 The `scripts/ci/clean-environment.sh` script cleans up test resources. It runs before and after conformance tests and is idempotent.

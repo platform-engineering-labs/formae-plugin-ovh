@@ -130,10 +130,12 @@ func (p *PrivateSubnetProvisioner) Read(ctx context.Context, request *resource.R
 			continue
 		}
 		if id, ok := subnet["id"].(string); ok && id == subnetID {
-			// Found the subnet - add network_id to properties for consistency
-			subnet["network_id"] = networkID
+			// Transform API response to match PKL schema.
+			// API returns: {id, cidr, gatewayIp, ipPools: [{dhcp, end, network, region, start}]}
+			// Schema expects: {id, network_id, region, network, dhcp, noGateway, start, end}
+			result := transformSubnetResponse(subnet, networkID)
 
-			propsJSON, err := json.Marshal(subnet)
+			propsJSON, err := json.Marshal(result)
 			if err != nil {
 				return &resource.ReadResult{
 					ErrorCode: resource.OperationErrorCodeServiceInternalError,
@@ -166,9 +168,62 @@ func (p *PrivateSubnetProvisioner) Status(ctx context.Context, request *resource
 	return p.base.Status(ctx, request)
 }
 
-// List is not implemented (no discovery for PrivateSubnet)
+// List enumerates all private subnets across all private networks.
+// Discovery calls List with empty AdditionalProperties, so we must iterate all networks.
 func (p *PrivateSubnetProvisioner) List(ctx context.Context, request *resource.ListRequest) (*resource.ListResult, error) {
-	return &resource.ListResult{}, nil
+	project := extractProject(request.TargetConfig)
+	if project == "" {
+		return nil, fmt.Errorf("project/serviceName is required but not found in target config")
+	}
+
+	// Step 1: List all private networks
+	networksURL := fmt.Sprintf("/cloud/project/%s/network/private", project)
+	networksResp, err := p.base.Client.Do(ctx, ovhtransport.RequestOptions{
+		Method: "GET",
+		Path:   networksURL,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list private networks: %w", err)
+	}
+
+	// Step 2: For each network, list its subnets
+	var nativeIDs []string
+	for _, item := range networksResp.BodyArray {
+		network, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		networkID, ok := network["id"].(string)
+		if !ok {
+			continue
+		}
+
+		subnetsURL := fmt.Sprintf("/cloud/project/%s/network/private/%s/subnet", project, networkID)
+		subnetsResp, err := p.base.Client.Do(ctx, ovhtransport.RequestOptions{
+			Method: "GET",
+			Path:   subnetsURL,
+		})
+		if err != nil {
+			continue // Skip networks we can't read subnets from
+		}
+
+		for _, subItem := range subnetsResp.BodyArray {
+			subnet, ok := subItem.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			subnetID, ok := subnet["id"].(string)
+			if !ok {
+				continue
+			}
+			// Native ID format: project/networkId/subnetId
+			nativeIDs = append(nativeIDs, fmt.Sprintf("%s/%s/%s", project, networkID, subnetID))
+		}
+	}
+
+	return &resource.ListResult{
+		NativeIDs: nativeIDs,
+	}, nil
 }
 
 // privateSubnetDefinition holds the resource definition for creating BaseResource instances
@@ -194,10 +249,11 @@ func init() {
 			resource.OperationCreate,
 			resource.OperationRead,
 			resource.OperationDelete,
+			resource.OperationList,
 		},
 	}
 
-	// Register with global registry using custom factory
+	// Register with global registry using custom factory (includes OperationList for discovery)
 	registry.Register(
 		PrivateSubnetResourceType,
 		privateSubnetDefinition.Operations,
@@ -216,4 +272,49 @@ func init() {
 			}
 		},
 	)
+}
+
+// transformSubnetResponse maps the OVH API GET response to PKL schema field names.
+// API returns: {id, cidr, gatewayIp, ipPools: [{dhcp, end, network, region, start}]}
+// Schema expects: {id, network_id, region, network, dhcp, noGateway, start, end}
+func transformSubnetResponse(subnet map[string]interface{}, networkID string) map[string]interface{} {
+	result := map[string]interface{}{
+		"id":         subnet["id"],
+		"network_id": networkID,
+	}
+
+	// Derive noGateway from gatewayIp (empty means no gateway)
+	gatewayIP, _ := subnet["gatewayIp"].(string)
+	result["noGateway"] = gatewayIP == ""
+
+	// Flatten ipPools[0] → top-level fields (dhcp, end, network, region, start)
+	if ipPools, ok := subnet["ipPools"].([]interface{}); ok && len(ipPools) > 0 {
+		if pool, ok := ipPools[0].(map[string]interface{}); ok {
+			for _, field := range []string{"dhcp", "end", "network", "region", "start"} {
+				if val, ok := pool[field]; ok {
+					result[field] = val
+				}
+			}
+		}
+	}
+
+	return result
+}
+
+// extractProject extracts the project/serviceName from target config JSON.
+func extractProject(targetConfig json.RawMessage) string {
+	return extractTargetField(targetConfig, []string{"ProjectId", "projectId", "ServiceName", "serviceName"})
+}
+
+func extractTargetField(targetConfig json.RawMessage, fields []string) string {
+	var cfg map[string]interface{}
+	if err := json.Unmarshal(targetConfig, &cfg); err != nil {
+		return ""
+	}
+	for _, field := range fields {
+		if val, ok := cfg[field].(string); ok && val != "" {
+			return val
+		}
+	}
+	return ""
 }

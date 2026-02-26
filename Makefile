@@ -127,3 +127,15 @@ conformance-test-discovery: install setup-credentials
 	echo "Post-test cleanup..."; \
 	./scripts/ci/clean-environment.sh || true; \
 	exit $$TEST_EXIT
+
+## conformance-test-crud-run: Run only CRUD lifecycle tests (no cleanup)
+## Used by CI matrix jobs where cleanup is managed separately.
+conformance-test-crud-run:
+	@echo "Running CRUD conformance tests..."
+	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=crud FORMAE_TEST_TIMEOUT="$(TIMEOUT)" ./scripts/run-conformance-tests.sh $(VERSION)
+
+## conformance-test-discovery-run: Run only discovery tests (no cleanup)
+## Used by CI matrix jobs where cleanup is managed separately.
+conformance-test-discovery-run:
+	@echo "Running discovery conformance tests..."
+	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=discovery FORMAE_TEST_TIMEOUT="$(TIMEOUT)" ./scripts/run-conformance-tests.sh $(VERSION)

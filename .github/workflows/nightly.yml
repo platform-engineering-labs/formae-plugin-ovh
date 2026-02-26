@@ -8,10 +8,77 @@ on:
     - cron: '0 3 * * *'  # 3 AM UTC
   workflow_dispatch:
 
+# Prevent concurrent conformance tests (CI and nightly share test resources)
+concurrency:
+  group: ovh-conformance-tests
+  cancel-in-progress: false
+
 jobs:
-  conformance-tests-main:
+  # Discover test cases from testdata/ directory for matrix strategy
+  discover-tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    outputs:
+      test-cases: ${{ steps.discover.outputs.test-cases }}
+    steps:
+      - name: Checkout plugin
+        uses: actions/checkout@v4
+
+      - name: Discover test cases
+        id: discover
+        run: |
+          # Find all *.pkl files in testdata/, exclude -update.pkl and -replace.pkl variants,
+          # and extract the base test case name
+          TEST_CASES=$(ls testdata/*.pkl 2>/dev/null \
+            | xargs -n1 basename \
+            | grep -v '\-update\.pkl$' \
+            | grep -v '\-replace\.pkl$' \
+            | sed 's/\.pkl$//' \
+            | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "Discovered test cases: ${TEST_CASES}"
+          echo "test-cases=${TEST_CASES}" >> "$GITHUB_OUTPUT"
+
+  # Clean up test resources before running any conformance tests
+  pre-cleanup:
+    needs: [discover-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout plugin
+        uses: actions/checkout@v4
+
+      - name: Configure credentials
+        run: |
+          echo "OVH_ENDPOINT=${{ secrets.OVH_ENDPOINT }}" >> $GITHUB_ENV
+          echo "OVH_APPLICATION_KEY=${{ secrets.OVH_APPLICATION_KEY }}" >> $GITHUB_ENV
+          echo "OVH_APPLICATION_SECRET=${{ secrets.OVH_APPLICATION_SECRET }}" >> $GITHUB_ENV
+          echo "OVH_CONSUMER_KEY=${{ secrets.OVH_CONSUMER_KEY }}" >> $GITHUB_ENV
+          echo "OVH_CLOUD_PROJECT_ID=${{ secrets.OVH_CLOUD_PROJECT_ID }}" >> $GITHUB_ENV
+          echo "OS_AUTH_URL=${{ secrets.OS_AUTH_URL }}" >> $GITHUB_ENV
+          echo "OS_USERNAME=${{ secrets.OS_USERNAME }}" >> $GITHUB_ENV
+          echo "OS_PASSWORD=${{ secrets.OS_PASSWORD }}" >> $GITHUB_ENV
+          echo "OS_PROJECT_ID=${{ secrets.OS_PROJECT_ID }}" >> $GITHUB_ENV
+          echo "OS_REGION_NAME=${{ secrets.OS_REGION_NAME }}" >> $GITHUB_ENV
+          echo "OS_USER_DOMAIN_NAME=${{ secrets.OS_USER_DOMAIN_NAME }}" >> $GITHUB_ENV
+          echo "OS_PROJECT_DOMAIN_NAME=${{ secrets.OS_PROJECT_DOMAIN_NAME }}" >> $GITHUB_ENV
+          echo "OS_IDENTITY_API_VERSION=3" >> $GITHUB_ENV
+
+      - name: Install OpenStack CLI
+        run: pip install python-openstackclient
+
+      - name: Clean test resources
+        run: ./scripts/ci/clean-environment.sh
+
+  # Conformance tests run the full CRUD lifecycle against real OVH resources.
+  # Each test case runs in its own isolated job via matrix strategy.
+  # Cleanup is handled by separate pre/post-cleanup jobs, NOT per test.
+  conformance-tests:
+    needs: [discover-tests, pre-cleanup]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        test-case: ${{ fromJson(needs.discover-tests.outputs.test-cases) }}
+      max-parallel: 10
+      fail-fast: false
 
     steps:
       - name: Checkout plugin
@@ -31,13 +98,20 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/platform-engineering-labs/formae.git /tmp/formae
           cd /tmp/formae
-          # Fetch tags so `git describe` works (needed for version embedding)
-          git fetch --tags --depth=1
-          make build
+          git fetch --tags
+          # Get latest release tag (sorted by semver) and pass to make
+          LATEST_TAG=$(git tag -l "[0-9]*" --sort=-version:refname | grep -v -- '-' | head -1)
+          echo "Building formae with VERSION=${LATEST_TAG}"
+          make build VERSION="${LATEST_TAG}"
           echo "FORMAE_BINARY=/tmp/formae/formae" >> $GITHUB_ENV
 
-      - name: Configure OpenStack Credentials
+      - name: Configure credentials
         run: |
+          echo "OVH_ENDPOINT=${{ secrets.OVH_ENDPOINT }}" >> $GITHUB_ENV
+          echo "OVH_APPLICATION_KEY=${{ secrets.OVH_APPLICATION_KEY }}" >> $GITHUB_ENV
+          echo "OVH_APPLICATION_SECRET=${{ secrets.OVH_APPLICATION_SECRET }}" >> $GITHUB_ENV
+          echo "OVH_CONSUMER_KEY=${{ secrets.OVH_CONSUMER_KEY }}" >> $GITHUB_ENV
+          echo "OVH_CLOUD_PROJECT_ID=${{ secrets.OVH_CLOUD_PROJECT_ID }}" >> $GITHUB_ENV
           echo "OS_AUTH_URL=${{ secrets.OS_AUTH_URL }}" >> $GITHUB_ENV
           echo "OS_USERNAME=${{ secrets.OS_USERNAME }}" >> $GITHUB_ENV
           echo "OS_PASSWORD=${{ secrets.OS_PASSWORD }}" >> $GITHUB_ENV
@@ -53,19 +127,111 @@ jobs:
       - name: Install plugin
         run: make install
 
-      - name: Run conformance tests against main
+      - name: Run conformance test (${{ matrix.test-case }})
         env:
           FORMAE_TEST_RUN_ID: nightly-main-${{ github.run_id }}
-        run: make conformance-test
+        run: make conformance-test-crud-run TEST=${{ matrix.test-case }}
+
+  # Clean up test resources after all conformance tests (always runs)
+  post-cleanup:
+    needs: [conformance-tests]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout plugin
+        uses: actions/checkout@v4
+
+      - name: Configure credentials
+        run: |
+          echo "OVH_ENDPOINT=${{ secrets.OVH_ENDPOINT }}" >> $GITHUB_ENV
+          echo "OVH_APPLICATION_KEY=${{ secrets.OVH_APPLICATION_KEY }}" >> $GITHUB_ENV
+          echo "OVH_APPLICATION_SECRET=${{ secrets.OVH_APPLICATION_SECRET }}" >> $GITHUB_ENV
+          echo "OVH_CONSUMER_KEY=${{ secrets.OVH_CONSUMER_KEY }}" >> $GITHUB_ENV
+          echo "OVH_CLOUD_PROJECT_ID=${{ secrets.OVH_CLOUD_PROJECT_ID }}" >> $GITHUB_ENV
+          echo "OS_AUTH_URL=${{ secrets.OS_AUTH_URL }}" >> $GITHUB_ENV
+          echo "OS_USERNAME=${{ secrets.OS_USERNAME }}" >> $GITHUB_ENV
+          echo "OS_PASSWORD=${{ secrets.OS_PASSWORD }}" >> $GITHUB_ENV
+          echo "OS_PROJECT_ID=${{ secrets.OS_PROJECT_ID }}" >> $GITHUB_ENV
+          echo "OS_REGION_NAME=${{ secrets.OS_REGION_NAME }}" >> $GITHUB_ENV
+          echo "OS_USER_DOMAIN_NAME=${{ secrets.OS_USER_DOMAIN_NAME }}" >> $GITHUB_ENV
+          echo "OS_PROJECT_DOMAIN_NAME=${{ secrets.OS_PROJECT_DOMAIN_NAME }}" >> $GITHUB_ENV
+          echo "OS_IDENTITY_API_VERSION=3" >> $GITHUB_ENV
+
+      - name: Install OpenStack CLI
+        run: pip install python-openstackclient
+
+      - name: Clean test resources
+        run: ./scripts/ci/clean-environment.sh
+
+  # Notify when nightly is fixed (was red, now green)
+  notify-fixed:
+    needs: [conformance-tests, post-cleanup]
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - name: Check if previous run failed
+        id: check_previous
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runs = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'nightly.yml',
+              per_page: 2,
+              status: 'completed'
+            });
+
+            // Get previous run (skip current which isn't completed yet)
+            const previousRun = runs.data.workflow_runs.find(run => run.id !== context.runId);
+
+            if (previousRun && previousRun.conclusion === 'failure') {
+              return 'true';
+            }
+            return 'false';
+          result-encoding: string
+
+      - name: Notify Slack (Fixed)
+        if: steps.check_previous.outputs.result == 'true'
+        uses: slackapi/slack-github-action@v2.1.1
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": ":white_check_mark: Nightly fixed on ${{ github.repository }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": ":white_check_mark: *Nightly fixed* on `${{ github.repository }}`\n\nPlugin conformance tests now passing against formae main branch."
+                  }
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Run"
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }
 
   # Notify on failure
   notify-failure:
-    needs: [conformance-tests-main]
+    needs: [conformance-tests, post-cleanup]
     runs-on: ubuntu-latest
     if: failure()
     steps:
       - name: Notify Slack
-        uses: slackapi/slack-github-action@v2.1.0
+        uses: slackapi/slack-github-action@v2.1.1
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
           webhook-type: incoming-webhook
