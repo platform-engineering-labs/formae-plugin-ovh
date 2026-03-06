@@ -17,18 +17,28 @@ testRunID = read("env:FORMAE_TEST_RUN_ID")
 // Default region for OVH resources (used by privatenetwork, subnet, etc.)
 region = read?("env:OS_REGION_NAME") ?? "DE1"
 
+// Short region name (strips trailing -N suffix, e.g. US-EAST-VA-1 -> US-EAST-VA)
+// Some OVH APIs return the short form, so use this when the API normalizes the region
+shortRegion = region.replaceFirst(Regex("-?\\d+$"), "")
+
 // OVH-provided resource IDs (these are pre-existing in the OVH environment)
 // Ext-Net is the public network provided by OVH for external connectivity
 extNetID = "b347ed75-8603-4ce0-a40c-c6c98a8820fc"
 
-// Ubuntu 24.04 image provided by OVH
-ubuntuImageID = "720fbd6e-6edb-4983-bfc6-dfc22ab23656"
+// Ubuntu 24.04 image provided by OVH - region-specific IDs
+ubuntuImageID = read?("env:OVH_IMAGE_ID") ?? "03302136-e20b-446e-8b27-cf0aaf161810"
 
-// s1-2 flavor (2GB RAM, 1 vCPU)
-flavorID = "3be7c73a-735a-4ee1-b8d4-83feb080109d"
+// s1-2 flavor (2GB RAM, 1 vCPU) - region-specific IDs
+flavorID = read?("env:OVH_FLAVOR_ID") ?? "a64381e7-c4e7-4b01-9fbe-da405c544d2e"
 
 // d2-2 flavor (2GB RAM, 1 vCPU, larger disk) - different from s1-2 to force replacement
-replacementFlavorID = "91ca682c-3d92-4a8d-afde-a88d00b7f21e"
+replacementFlavorID = read?("env:OVH_REPLACEMENT_FLAVOR_ID") ?? "c4fbe989-4e2f-487c-b9db-9eb29808b826"
+
+// OVH Cloud Project ID (required for Database, Kube, Registry resources)
+serviceName = read("env:OVH_CLOUD_PROJECT_ID")
+
+// DNS zone for DNS record/redirection tests (must be a zone you own)
+dnsZone = read?("env:OVH_DNS_ZONE") ?? "example.com"
 
 // Common stack definition
 stack = new formae.Stack {
