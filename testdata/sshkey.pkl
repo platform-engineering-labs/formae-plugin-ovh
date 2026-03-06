@@ -1,0 +1,22 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@ovh/compute/sshkey.pkl"
+
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new sshkey.SSHKey {
+    label = "plugin-sdk-test-sshkey"
+    name = "formae-plugin-sdk-test-\(v.testRunID)"
+    publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIK0ANvaN++HAWyKgoZY2b+4v8zZ5FvKzfBQ//FaIWZYT formae-test"
+  }
+}

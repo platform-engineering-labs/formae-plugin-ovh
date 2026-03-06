@@ -1,0 +1,32 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@ovh/network/network.pkl"
+import "@ovh/network/port.pkl"
+
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  // Network for the port
+  local testNetwork = new network.Network {
+    label = "plugin-sdk-test-port-network"
+    name = "formae-plugin-sdk-test-port-net-\(v.testRunID)"
+    admin_state_up = true
+  }
+  testNetwork
+
+  new port.Port {
+    label = "plugin-sdk-test-port"
+    name = "formae-plugin-sdk-test-\(v.testRunID)"
+    network_id = testNetwork.res.id
+    admin_state_up = true
+  }
+}

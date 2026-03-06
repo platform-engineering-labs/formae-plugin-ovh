@@ -1,0 +1,25 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@ovh/compute/volume.pkl"
+
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new volume.Volume {
+    label = "plugin-sdk-test-volume"
+    name = "formae-plugin-sdk-test-\(v.testRunID)-updated" // name is mutable
+    size = 10
+    region = v.region
+    volumeType = "classic"
+    description = "Formae conformance test volume - updated" // description is mutable
+  }
+}

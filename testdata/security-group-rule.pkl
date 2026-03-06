@@ -1,0 +1,37 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@ovh/network/securitygroup.pkl"
+import "@ovh/network/securitygrouprule.pkl"
+
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  // Security group for the rule
+  local testSG = new securitygroup.SecurityGroup {
+    label = "plugin-sdk-test-sgrule-sg"
+    name = "formae-plugin-sdk-test-sgrule-\(v.testRunID)"
+    description = "SG for security group rule test"
+  }
+  testSG
+
+  new securitygrouprule.SecurityGroupRule {
+    label = "plugin-sdk-test-securitygrouprule"
+    security_group_id = testSG.res.id
+    direction = "ingress"
+    ethertype = "IPv4"
+    protocol = "tcp"
+    port_range_min = 443
+    port_range_max = 443
+    remote_ip_prefix = "0.0.0.0/0"
+    description = "Allow HTTPS inbound"
+  }
+}

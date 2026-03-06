@@ -1,0 +1,23 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@ovh/network/router.pkl"
+
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new router.Router {
+    label = "plugin-sdk-test-router"
+    name = "formae-plugin-sdk-test-\(v.testRunID)"
+    description = "Formae conformance test router"
+    admin_state_up = true
+  }
+}
