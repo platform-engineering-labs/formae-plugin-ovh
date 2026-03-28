@@ -1,9 +1,9 @@
 module github.com/platform-engineering-labs/formae-plugin-ovh
 
-go 1.25
+go 1.25.0
 
 require (
-	github.com/gophercloud/gophercloud/v2 v2.10.0
+	github.com/gophercloud/gophercloud/v2 v2.11.1
 	github.com/ovh/go-ovh v1.9.0
 	github.com/platform-engineering-labs/formae/pkg/model v0.1.6
 	github.com/platform-engineering-labs/formae/pkg/plugin v0.1.21
