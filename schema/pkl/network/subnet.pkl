@@ -78,6 +78,7 @@ open class Subnet extends formae.Resource {
   @ovh.FieldHint {
     required = false
     createOnly = true
+    hasProviderDefault = true
   }
   allocation_pools: Listing<AllocationPool>?
 

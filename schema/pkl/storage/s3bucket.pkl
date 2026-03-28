@@ -119,7 +119,7 @@ open class S3Bucket extends formae.Resource {
   name: String
 
   /// Owner user ID
-  @ovh.FieldHint { createOnly = true }
+  @ovh.FieldHint { createOnly = true; hasProviderDefault = true }
   ownerId: Int?
 
   /// Versioning configuration
@@ -130,7 +130,7 @@ open class S3Bucket extends formae.Resource {
   encryption: Encryption?
 
   /// Object lock configuration (can only be set at creation)
-  @ovh.FieldHint { createOnly = true }
+  @ovh.FieldHint { createOnly = true; hasProviderDefault = true }
   objectLock: ObjectLock?
 
   /// Bucket tags

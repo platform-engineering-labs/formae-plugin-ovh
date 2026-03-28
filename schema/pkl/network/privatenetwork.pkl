@@ -54,6 +54,7 @@ open class PrivateNetwork extends formae.Resource {
   @ovh.FieldHint {
     required = false
     createOnly = true
+    hasProviderDefault = true
   }
   vlanId: Int(isBetween(0, 4095))?
 

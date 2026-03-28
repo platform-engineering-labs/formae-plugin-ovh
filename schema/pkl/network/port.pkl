@@ -62,6 +62,7 @@ open class Port extends formae.Resource {
 
   @ovh.FieldHint {
     required = false
+    hasProviderDefault = true
   }
   security_groups: Listing<String>?
 

@@ -50,12 +50,14 @@ open class Network extends formae.Resource {
   @ovh.FieldHint {
     required = false
     createOnly = true
+    hasProviderDefault = true
   }
   shared: Boolean?
 
   @ovh.FieldHint {
     required = false
     createOnly = true
+    hasProviderDefault = true
   }
   mtu: Int?
 
