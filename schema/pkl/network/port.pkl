@@ -45,6 +45,7 @@ open class Port extends formae.Resource {
   @ovh.FieldHint {
     required = false
     createOnly = true  // OVH does not support updating description on ports
+    hasProviderDefault = true
   }
   description: String?
 
@@ -74,6 +75,7 @@ open class Port extends formae.Resource {
   @ovh.FieldHint {
     required = false
     createOnly = true
+    hasProviderDefault = true
   }
   mac_address: String?
 
