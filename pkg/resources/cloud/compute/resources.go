@@ -88,10 +88,11 @@ func init() {
 		{
 			ResourceType: VolumeResourceType,
 			ResourceConfig: base.ResourceConfig{
-				ResourceType:   "volume",
-				Scope:          &base.ScopeConfig{Type: base.ScopeProject},
-				SupportsUpdate: true,
-				UpdateMethod:   base.UpdateMethodPut,
+				ResourceType:     "volume",
+				Scope:            &base.ScopeConfig{Type: base.ScopeProject},
+				SupportsUpdate:   true,
+				UpdateMethod:     base.UpdateMethodPut,
+				DeletingStatuses: []string{"deleting"},
 			},
 			Operations: []resource.Operation{
 				resource.OperationCreate,

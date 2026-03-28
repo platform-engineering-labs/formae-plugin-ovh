@@ -203,6 +203,20 @@ func (b *BaseResource) Read(ctx context.Context, request *resource.ReadRequest) 
 	}
 
 	responseProps := response.Body
+
+	// Treat resources in a deleting state as not found so sync can tombstone them
+	if len(b.ResourceConfig.DeletingStatuses) > 0 {
+		if status, ok := responseProps["status"].(string); ok {
+			for _, ds := range b.ResourceConfig.DeletingStatuses {
+				if status == ds {
+					return &resource.ReadResult{
+						ErrorCode: resource.OperationErrorCodeNotFound,
+					}, nil
+				}
+			}
+		}
+	}
+
 	if b.ResponseTransformer != nil {
 		transformCtx := b.buildTransformContext(ctx, pathCtx, resource.OperationRead)
 		responseProps = b.ResponseTransformer.Transform(responseProps, transformCtx)

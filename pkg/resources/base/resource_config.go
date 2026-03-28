@@ -57,4 +57,9 @@ type ResourceConfig struct {
 	UpdateQueryParams    map[string]string
 	OptimisticLocking    *OptimisticLockingConfig
 	RequestWrapper       string
+
+	// DeletingStatuses lists status values that indicate the resource is being
+	// deleted. When Read encounters one of these in the "status" response field,
+	// it returns NotFound so formae's sync correctly tombstones the resource.
+	DeletingStatuses []string
 }
