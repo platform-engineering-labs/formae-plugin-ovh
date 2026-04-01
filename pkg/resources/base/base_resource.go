@@ -384,10 +384,19 @@ func (b *BaseResource) Delete(ctx context.Context, request *resource.DeleteReque
 		_ = b.OperationConfig.PostMutationHook(pathCtx)
 	}
 
+	// For resources with async deletion (DeletingStatuses configured), return InProgress
+	// so formae polls Status until the resource returns 404 (fully deleted).
+	// This prevents race conditions where a sync Read finds the resource still existing
+	// briefly after a DELETE call.
+	operationStatus := resource.OperationStatusSuccess
+	if len(b.ResourceConfig.DeletingStatuses) > 0 && b.StatusChecker != nil {
+		operationStatus = resource.OperationStatusInProgress
+	}
+
 	return &resource.DeleteResult{
 		ProgressResult: &resource.ProgressResult{
 			Operation:       resource.OperationDelete,
-			OperationStatus: resource.OperationStatusSuccess,
+			OperationStatus: operationStatus,
 			NativeID:        request.NativeID,
 		},
 	}, nil

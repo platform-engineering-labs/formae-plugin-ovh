@@ -30,6 +30,18 @@ func instanceStatusChecker(resourceData map[string]interface{}) (bool, error) {
 	return status == "ACTIVE", nil
 }
 
+// volumeStatusChecker verifies the volume has reached "available" status.
+// OVH volumes go through creating -> available (or deleting) states.
+// This enables async delete polling: after DELETE, formae polls Status until
+// the volume returns 404 (gone) or remains in a non-available state.
+func volumeStatusChecker(resourceData map[string]interface{}) (bool, error) {
+	status, ok := resourceData["status"].(string)
+	if !ok {
+		return false, nil
+	}
+	return status == "available", nil
+}
+
 func init() {
 	cloudComputeRegistry = base.NewResourceRegistry(cloud.CloudAPI, cloud.CloudOperations, cloud.CloudNativeID)
 
@@ -94,12 +106,14 @@ func init() {
 				UpdateMethod:     base.UpdateMethodPut,
 				DeletingStatuses: []string{"deleting"},
 			},
+			StatusChecker: volumeStatusChecker,
 			Operations: []resource.Operation{
 				resource.OperationCreate,
 				resource.OperationRead,
 				resource.OperationUpdate,
 				resource.OperationDelete,
 				resource.OperationList,
+				resource.OperationCheckStatus,
 			},
 		},
 	})
