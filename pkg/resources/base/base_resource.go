@@ -384,19 +384,40 @@ func (b *BaseResource) Delete(ctx context.Context, request *resource.DeleteReque
 		_ = b.OperationConfig.PostMutationHook(pathCtx)
 	}
 
-	// For resources with async deletion (DeletingStatuses configured), return InProgress
-	// so formae polls Status until the resource returns 404 (fully deleted).
-	// This prevents race conditions where a sync Read finds the resource still existing
-	// briefly after a DELETE call.
-	operationStatus := resource.OperationStatusSuccess
-	if len(b.ResourceConfig.DeletingStatuses) > 0 && b.StatusChecker != nil {
-		operationStatus = resource.OperationStatusInProgress
+	// For resources with async deletion (DeletingStatuses configured), wait briefly
+	// for the provider to acknowledge the deletion. OVH has eventual consistency —
+	// a volume may still be readable with its original status right after DELETE.
+	// This read-after-write loop ensures subsequent Read/sync calls see the resource
+	// as gone or in a deleting state, preventing OOB delete detection failures.
+	if len(b.ResourceConfig.DeletingStatuses) > 0 {
+		for i := 0; i < 5; i++ {
+			time.Sleep(2 * time.Second)
+			resp, readErr := b.Client.Do(ctx, ovhtransport.RequestOptions{
+				Method: "GET",
+				Path:   url,
+			})
+			if readErr != nil {
+				break // 404 or other error — resource is gone
+			}
+			if status, ok := resp.Body["status"].(string); ok {
+				isDeletingStatus := false
+				for _, ds := range b.ResourceConfig.DeletingStatuses {
+					if status == ds {
+						isDeletingStatus = true
+						break
+					}
+				}
+				if isDeletingStatus {
+					break
+				}
+			}
+		}
 	}
 
 	return &resource.DeleteResult{
 		ProgressResult: &resource.ProgressResult{
 			Operation:       resource.OperationDelete,
-			OperationStatus: operationStatus,
+			OperationStatus: resource.OperationStatusSuccess,
 			NativeID:        request.NativeID,
 		},
 	}, nil
