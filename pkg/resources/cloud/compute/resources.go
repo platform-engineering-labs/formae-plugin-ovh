@@ -104,7 +104,7 @@ func init() {
 				Scope:            &base.ScopeConfig{Type: base.ScopeProject},
 				SupportsUpdate:   true,
 				UpdateMethod:     base.UpdateMethodPut,
-				DeletingStatuses: []string{"deleting"},
+				DeletingStatuses: []string{"deleting", "deleted"},
 			},
 			StatusChecker: volumeStatusChecker,
 			Operations: []resource.Operation{
