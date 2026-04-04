@@ -5,8 +5,12 @@
 package network
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/base"
 	"github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/cloud"
+	ovhtransport "github.com/platform-engineering-labs/formae-plugin-ovh/pkg/transport/ovh"
 	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
@@ -60,6 +64,20 @@ func privateNetworkStatusChecker(resourceData map[string]interface{}) (bool, err
 	return true, nil
 }
 
+// privateNetworkReadinessProbe verifies the network is visible on the subnet
+// API endpoint. OVH has eventual consistency between the network and subnet
+// endpoints — a network can be ACTIVE on its own endpoint but not yet visible
+// when creating subnets. This probe hits the subnet list endpoint to confirm.
+func privateNetworkReadinessProbe(ctx context.Context, client base.TransportClient, pathCtx base.PathContext) (bool, error) {
+	url := fmt.Sprintf("/cloud/project/%s/network/private/%s/subnet", pathCtx.Project, pathCtx.ResourceName)
+	_, err := client.Do(ctx, ovhtransport.RequestOptions{Method: "GET", Path: url})
+	if err != nil {
+		// Network not yet visible on subnet endpoint
+		return false, nil
+	}
+	return true, nil
+}
+
 func init() {
 	cloudNetworkRegistry = base.NewResourceRegistry(cloud.CloudAPI, cloud.CloudOperations, cloud.CloudNativeID)
 
@@ -100,7 +118,8 @@ func init() {
 				resource.OperationCheckStatus, // Wait for region activation before dependent resources
 			},
 			// Check that all regions have ACTIVE status before allowing dependent resources
-			StatusChecker: privateNetworkStatusChecker,
+			StatusChecker:  privateNetworkStatusChecker,
+			ReadinessProbe: privateNetworkReadinessProbe,
 		},
 		// Subnet (nested under region-based network)
 		// Path: /cloud/project/{serviceName}/region/{regionName}/network/{networkId}/subnet

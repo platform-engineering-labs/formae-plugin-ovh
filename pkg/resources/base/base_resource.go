@@ -24,6 +24,7 @@ type BaseResource struct {
 	RequestTransformer  RequestTransformer
 	ResponseTransformer ResponseTransformer
 	StatusChecker       StatusChecker
+	ReadinessProbe      ReadinessProbe
 	Client              TransportClient
 }
 
@@ -591,6 +592,23 @@ func (b *BaseResource) Status(ctx context.Context, request *resource.StatusReque
 				NativeID:        request.NativeID,
 			},
 		}, nil
+	}
+
+	// If a readiness probe is configured, verify the resource is visible on
+	// dependent API endpoints before reporting success.
+	if b.ReadinessProbe != nil {
+		probeReady, probeErr := b.ReadinessProbe(ctx, b.Client, pathCtx)
+		if probeErr != nil || !probeReady {
+			return &resource.StatusResult{
+				ProgressResult: &resource.ProgressResult{
+					Operation:       resource.OperationCheckStatus,
+					OperationStatus: resource.OperationStatusInProgress,
+					StatusMessage:   "Resource is active but not yet visible on dependent endpoints",
+					RequestID:       request.RequestID,
+					NativeID:        request.NativeID,
+				},
+			}, nil
+		}
 	}
 
 	// Resource is ready - apply response transformer if configured

@@ -15,6 +15,13 @@ import (
 // Returns true if the resource is ready, false if still pending.
 type StatusChecker func(resourceData map[string]interface{}) (ready bool, err error)
 
+// ReadinessProbe performs an additional check after StatusChecker returns true.
+// Use this to verify the resource is visible on dependent API endpoints before
+// reporting it as ready. OVH has eventual consistency between API endpoints,
+// so a resource may be ACTIVE on its own endpoint but not yet visible on
+// endpoints that dependents use (e.g. subnet endpoint for a private network).
+type ReadinessProbe func(ctx context.Context, client TransportClient, pathCtx PathContext) (ready bool, err error)
+
 // ResourceDefinition defines a complete resource registration
 type ResourceDefinition struct {
 	ResourceType        string
@@ -24,7 +31,8 @@ type ResourceDefinition struct {
 	NativeIDConfig      NativeIDConfig
 	RequestTransformer  RequestTransformer
 	ResponseTransformer ResponseTransformer
-	StatusChecker       StatusChecker // Optional: checks if resource is ready after creation
+	StatusChecker       StatusChecker  // Optional: checks if resource is ready after creation
+	ReadinessProbe      ReadinessProbe // Optional: additional check after StatusChecker passes
 	Operations          []resource.Operation
 }
 
@@ -119,6 +127,7 @@ func (r *ResourceRegistry) CreateProvisioner(client *ovhtransport.Client, resour
 		RequestTransformer:  def.RequestTransformer,
 		ResponseTransformer: def.ResponseTransformer,
 		StatusChecker:       def.StatusChecker,
+		ReadinessProbe:      def.ReadinessProbe,
 		Client:              client,
 	}
 
