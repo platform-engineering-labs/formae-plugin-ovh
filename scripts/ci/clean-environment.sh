@@ -35,13 +35,13 @@ ovh_api() {
         return 1
     fi
 
-    # Resolve endpoint alias to base URL
+    # Resolve endpoint alias to base URL (go-ovh aliases)
     case "${endpoint}" in
-        ovh-eu)       local base_url="https://eu.api.ovh.com/1.0" ;;
-        ovh-us)       local base_url="https://api.us.ovhcloud.com/1.0" ;;
-        ovh-ca)       local base_url="https://ca.api.ovh.com/1.0" ;;
-        https://*)    local base_url="${endpoint}" ;;
-        *)            local base_url="https://eu.api.ovh.com/1.0" ;;
+        ovh-eu|soyoustart-eu|kimsufi-eu)  local base_url="https://eu.api.ovh.com/1.0" ;;
+        ovh-us)                            local base_url="https://api.us.ovhcloud.com/1.0" ;;
+        ovh-ca|soyoustart-ca|kimsufi-ca)  local base_url="https://ca.api.ovh.com/1.0" ;;
+        https://*)                         local base_url="${endpoint}" ;;
+        *)                                 local base_url="https://eu.api.ovh.com/1.0" ;;
     esac
 
     local url="${base_url}${path}"
@@ -70,8 +70,13 @@ ovh_api() {
 # so we must clean them via the OVH REST API.
 if [[ -n "${OVH_APPLICATION_KEY:-}" && -n "${OVH_CLOUD_PROJECT_ID:-}" ]]; then
     echo "Cleaning OVH private networks via OVH API..."
-    network_ids=$(ovh_api GET "/cloud/project/${OVH_CLOUD_PROJECT_ID}/network/private" 2>/dev/null \
-        | jq -r '.[].id // empty' 2>/dev/null || true)
+    raw_response=$(ovh_api GET "/cloud/project/${OVH_CLOUD_PROJECT_ID}/network/private" 2>/dev/null || true)
+    if echo "${raw_response}" | jq empty 2>/dev/null; then
+        network_ids=$(echo "${raw_response}" | jq -r '.[].id // empty' 2>/dev/null || true)
+    else
+        echo "  Warning: OVH API returned unexpected response: ${raw_response:0:200}"
+        network_ids=""
+    fi
     if [[ -n "${network_ids}" ]]; then
         echo "${network_ids}" | while read -r net_id; do
             [[ -z "${net_id}" ]] && continue
