@@ -18,6 +18,73 @@ set -euo pipefail
 echo "=== NUKING OVH/OpenStack environment ==="
 echo ""
 
+# ---- OVH API helper (signed requests) ----
+# The OVH API uses HMAC-SHA1 signatures. We need this to clean up
+# private networks which are NOT visible through the OpenStack Neutron API.
+ovh_api() {
+    local method="$1"
+    local path="$2"
+    local body="${3:-}"
+
+    local ak="${OVH_APPLICATION_KEY:-}"
+    local as="${OVH_APPLICATION_SECRET:-}"
+    local ck="${OVH_CONSUMER_KEY:-}"
+    local endpoint="${OVH_ENDPOINT:-}"
+
+    if [[ -z "${ak}" || -z "${as}" || -z "${ck}" ]]; then
+        return 1
+    fi
+
+    # Resolve endpoint alias to base URL
+    case "${endpoint}" in
+        ovh-eu)       local base_url="https://eu.api.ovh.com/1.0" ;;
+        ovh-us)       local base_url="https://api.us.ovhcloud.com/1.0" ;;
+        ovh-ca)       local base_url="https://ca.api.ovh.com/1.0" ;;
+        https://*)    local base_url="${endpoint}" ;;
+        *)            local base_url="https://eu.api.ovh.com/1.0" ;;
+    esac
+
+    local url="${base_url}${path}"
+    local timestamp
+    timestamp=$(curl -s "${base_url}/auth/time")
+    local sig_data="\$1\$$(echo -n "${as}+${ck}+${method}+${url}+${body}+${timestamp}" | sha1sum | awk '{print $1}')"
+
+    local -a curl_args=(
+        -s -X "${method}"
+        -H "X-Ovh-Application: ${ak}"
+        -H "X-Ovh-Consumer: ${ck}"
+        -H "X-Ovh-Timestamp: ${timestamp}"
+        -H "X-Ovh-Signature: ${sig_data}"
+        -H "Content-Type: application/json"
+    )
+
+    if [[ -n "${body}" ]]; then
+        curl_args+=(-d "${body}")
+    fi
+
+    curl "${curl_args[@]}" "${url}"
+}
+
+# ---- OVH API: Clean private networks ----
+# OVH private networks are NOT visible through OpenStack Neutron,
+# so we must clean them via the OVH REST API.
+if [[ -n "${OVH_APPLICATION_KEY:-}" && -n "${OVH_CLOUD_PROJECT_ID:-}" ]]; then
+    echo "Cleaning OVH private networks via OVH API..."
+    network_ids=$(ovh_api GET "/cloud/project/${OVH_CLOUD_PROJECT_ID}/network/private" 2>/dev/null \
+        | jq -r '.[].id // empty' 2>/dev/null || true)
+    if [[ -n "${network_ids}" ]]; then
+        echo "${network_ids}" | while read -r net_id; do
+            [[ -z "${net_id}" ]] && continue
+            echo "  Deleting OVH private network: ${net_id}"
+            ovh_api DELETE "/cloud/project/${OVH_CLOUD_PROJECT_ID}/network/private/${net_id}" 2>/dev/null || echo "  Warning: Failed to delete ${net_id}"
+        done
+    else
+        echo "  No OVH private networks found"
+    fi
+else
+    echo "Skipping OVH private network cleanup (OVH API credentials not set)"
+fi
+
 # Check if openstack CLI is available
 if ! command -v openstack &> /dev/null; then
     echo "Warning: openstack CLI not found. Skipping cleanup."
