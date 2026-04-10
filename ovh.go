@@ -14,6 +14,7 @@ import (
 	"github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/registry"
 	openstacktransport "github.com/platform-engineering-labs/formae-plugin-ovh/pkg/transport/openstack"
 	ovhtransport "github.com/platform-engineering-labs/formae-plugin-ovh/pkg/transport/ovh"
+	"github.com/platform-engineering-labs/formae/pkg/model"
 	"github.com/platform-engineering-labs/formae/pkg/plugin"
 	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 
@@ -39,23 +40,22 @@ type Plugin struct{}
 var _ plugin.ResourcePlugin = &Plugin{}
 
 // RateLimit returns the rate limit configuration for this plugin
-func (p *Plugin) RateLimit() plugin.RateLimitConfig {
-	return plugin.RateLimitConfig{
-		Scope:                            plugin.RateLimitScopeNamespace,
-		MaxRequestsPerSecondForNamespace: 2, // Conservative rate limit for APIs
+func (p *Plugin) RateLimit() model.RateLimitConfig {
+	return model.RateLimitConfig{
+		MaxRequestsPerSecond: 2, // Conservative rate limit for APIs
 	}
 }
 
 // DiscoveryFilters returns declarative filters for discovery.
 // OVH doesn't need any special filters currently.
-func (p *Plugin) DiscoveryFilters() []plugin.MatchFilter {
+func (p *Plugin) DiscoveryFilters() []model.MatchFilter {
 	return nil
 }
 
 // LabelConfig returns the label extraction configuration for discovered OVH resources.
 // Most resources have a "name" property, with FloatingIP being the exception.
-func (p *Plugin) LabelConfig() plugin.LabelConfig {
-	return plugin.LabelConfig{
+func (p *Plugin) LabelConfig() model.LabelConfig {
+	return model.LabelConfig{
 		DefaultQuery: "$.name",
 		ResourceOverrides: map[string]string{
 			// FloatingIP doesn't have a name, use the IP address
