@@ -42,7 +42,8 @@ var _ plugin.ResourcePlugin = &Plugin{}
 // RateLimit returns the rate limit configuration for this plugin
 func (p *Plugin) RateLimit() model.RateLimitConfig {
 	return model.RateLimitConfig{
-		MaxRequestsPerSecond: 2, // Conservative rate limit for APIs
+		Scope:                            model.RateLimitScopeNamespace,
+		MaxRequestsPerSecondForNamespace: 2, // Conservative rate limit for APIs
 	}
 }
 
