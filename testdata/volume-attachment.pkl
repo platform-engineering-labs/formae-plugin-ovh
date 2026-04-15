@@ -1,0 +1,76 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@ovh/compute/instance.pkl"
+import "@ovh/compute/volume.pkl"
+import "@ovh/compute/volumeattachment.pkl"
+import "@ovh/network/privatenetwork.pkl"
+import "@ovh/network/privatesubnet.pkl"
+
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  // Private network for the instance
+  // Use vlanId 300 to avoid conflicts with other tests
+  local testNetwork = new privatenetwork.PrivateNetwork {
+    label = "plugin-sdk-test-volattach-network"
+    name = "formae-plugin-sdk-test-volattach-net-\(v.testRunID)"
+    regions {
+      v.region
+    }
+    vlanId = 300
+  }
+  testNetwork
+
+  local testSubnet = new privatesubnet.PrivateSubnet {
+    label = "plugin-sdk-test-volattach-subnet"
+    region = v.region
+    network_id = testNetwork.res.id
+    network = "10.0.3.0/24"
+    dhcp = true
+    noGateway = false
+    start = "10.0.3.2"
+    end = "10.0.3.254"
+  }
+  testSubnet
+
+  // Instance to attach the volume to
+  local testInstance = new instance.Instance {
+    label = "plugin-sdk-test-volattach-instance"
+    name = "formae-plugin-sdk-test-volattach-\(v.testRunID)"
+    flavorId = v.flavorID
+    region = v.region
+    imageId = v.ubuntuImageID
+    networks {
+      new instance.NetworkParams {
+        networkId = testSubnet.res.network_id // Use subnet resolvable to ensure subnet is created before instance
+      }
+    }
+  }
+  testInstance
+
+  // Volume to attach
+  local testVolume = new volume.Volume {
+    label = "plugin-sdk-test-volattach-volume"
+    name = "formae-plugin-sdk-test-volattach-vol-\(v.testRunID)"
+    size = 10
+    region = v.region
+    volumeType = "classic"
+  }
+  testVolume
+
+  // Volume attachment (create + delete only, no update/replace)
+  new volumeattachment.VolumeAttachment {
+    label = "plugin-sdk-test-volumeattachment"
+    volume_id = testVolume.res.id
+    instance_id = testInstance.res.id
+  }
+}

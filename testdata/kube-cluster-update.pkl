@@ -1,0 +1,25 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@ovh/kube/cluster.pkl"
+
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new cluster.Cluster {
+    label = "plugin-sdk-test-kubecluster"
+    serviceName = v.serviceName
+    name = "formae-test-\(v.testRunID)-updated" // name is mutable
+    region = v.region
+    version = "1.28"
+    updatePolicy = "NEVER_UPDATE"
+  }
+}

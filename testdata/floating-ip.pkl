@@ -1,0 +1,65 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@ovh/compute/instance.pkl"
+import "@ovh/network/floatingip.pkl"
+import "@ovh/network/privatenetwork.pkl"
+import "@ovh/network/privatesubnet.pkl"
+
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  // Private network for the instance
+  // Use vlanId 500 to avoid conflicts with other tests
+  local testNetwork = new privatenetwork.PrivateNetwork {
+    label = "plugin-sdk-test-fip-network"
+    name = "formae-plugin-sdk-test-fip-net-\(v.testRunID)"
+    regions {
+      v.region
+    }
+    vlanId = 500
+  }
+  testNetwork
+
+  local testSubnet = new privatesubnet.PrivateSubnet {
+    label = "plugin-sdk-test-fip-subnet"
+    region = v.region
+    network_id = testNetwork.res.id
+    network = "10.0.5.0/24"
+    dhcp = true
+    noGateway = false
+    start = "10.0.5.2"
+    end = "10.0.5.254"
+  }
+  testSubnet
+
+  // Instance to attach the floating IP to
+  local testInstance = new instance.Instance {
+    label = "plugin-sdk-test-fip-instance"
+    name = "formae-plugin-sdk-test-fip-\(v.testRunID)"
+    flavorId = v.flavorID
+    region = v.region
+    imageId = v.ubuntuImageID
+    networks {
+      new instance.NetworkParams {
+        networkId = testSubnet.res.network_id // Use subnet resolvable to ensure subnet is created before instance
+      }
+    }
+  }
+  testInstance
+
+  // Floating IP - all fields are createOnly, no update/replace possible
+  new floatingip.FloatingIP {
+    label = "plugin-sdk-test-floatingip"
+    instance_id = testInstance.res.id
+    ip = testInstance.res.privateIp
+  }
+}

@@ -1,0 +1,35 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@ovh/registry/registry.pkl"
+import "@ovh/registry/ip_restriction_registry.pkl"
+
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  // Registry for the IP restriction
+  local testRegistry = new registry.Registry {
+    label = "plugin-sdk-test-regiprestriction-registry"
+    serviceName = v.serviceName
+    name = "formae-ipr-\(v.testRunID)"
+    region = v.region
+  }
+  testRegistry
+
+  new ip_restriction_registry.IpRestriction {
+    label = "plugin-sdk-test-registryiprestriction"
+    serviceName = v.serviceName
+    registryId = testRegistry.res.id
+    ipBlock = "192.0.2.0/24"
+    type = "management"
+    description = "Formae conformance test registry IP restriction"
+  }
+}

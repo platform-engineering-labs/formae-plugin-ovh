@@ -1,0 +1,31 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@ovh/database/service.pkl"
+
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new service.Service {
+    label = "plugin-sdk-test-databaseservice"
+    serviceName = v.serviceName
+    engine = "postgresql"
+    version = "14"
+    plan = "essential"
+    flavor = "db1-4"
+    description = "Formae conformance test database service"
+    nodes {
+      new service.Node {
+        region = v.region
+      }
+    }
+  }
+}
