@@ -158,6 +158,17 @@ jobs:
                 }
               }')" || echo "[telemetry] event send failed (non-critical)" >&2
 
+      - name: Inject formae replace directives
+        run: |
+          FORMAE_SRC=/tmp/formae
+          for pkg in pkg/auth pkg/model pkg/plugin pkg/plugin-conformance-tests; do
+            if grep -q "formae/$pkg" go.mod 2>/dev/null; then
+              echo "Injecting replace for $pkg -> $FORMAE_SRC/$pkg"
+              go mod edit -replace "github.com/platform-engineering-labs/formae/$pkg=$FORMAE_SRC/$pkg"
+            fi
+          done
+          go mod tidy
+
       - name: Configure credentials
         run: |
           echo "OVH_ENDPOINT=${{ secrets.OVH_ENDPOINT }}" >> $GITHUB_ENV
