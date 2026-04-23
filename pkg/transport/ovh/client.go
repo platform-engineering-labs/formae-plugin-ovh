@@ -51,6 +51,12 @@ func NewClient(cfg *OVHConfig) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create OVH client: %w", err)
 	}
+
+	// The go-ovh library sets a Timeout field but does not propagate it to the
+	// underlying http.Client. Without this, API calls have no timeout and can
+	// hang indefinitely if the OVH API is unresponsive.
+	ovhClient.Client.Timeout = ovhClient.Timeout
+
 	return &Client{ovh: ovhClient}, nil
 }
 
