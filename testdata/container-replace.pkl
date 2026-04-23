@@ -1,0 +1,24 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@ovh/storage/container.pkl"
+
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new container.Container {
+    label = "plugin-sdk-test-container"
+    containerName = "formae-test-\(v.testRunID)-replaced" // createOnly change forces replacement
+    region = v.shortRegion
+    archive = false
+    containerType = "private"
+  }
+}

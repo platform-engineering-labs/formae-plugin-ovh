@@ -1,0 +1,60 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@ovh/database/service.pkl"
+import "@ovh/database/integration.pkl"
+
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  // PostgreSQL service (source)
+  local pgService = new service.Service {
+    label = "plugin-sdk-test-integration-pg"
+    serviceName = v.serviceName
+    engine = "postgresql"
+    version = "14"
+    plan = "essential"
+    flavor = "db1-4"
+    nodes {
+      new service.Node {
+        region = v.region
+      }
+    }
+  }
+  pgService
+
+  // OpenSearch service (destination for logs)
+  local osService = new service.Service {
+    label = "plugin-sdk-test-integration-os"
+    serviceName = v.serviceName
+    engine = "opensearch"
+    version = "2"
+    plan = "essential"
+    flavor = "db1-4"
+    nodes {
+      new service.Node {
+        region = v.region
+      }
+    }
+  }
+  osService
+
+  // Integration: PostgreSQL logs -> OpenSearch (all fields are createOnly, no update)
+  new integration.Integration {
+    label = "plugin-sdk-test-databaseintegration"
+    serviceName = v.serviceName
+    engine = "postgresql"
+    clusterId = pgService.res.id
+    type = "opensearchLogs"
+    destinationServiceId = osService.res.id
+    sourceServiceId = pgService.res.id
+  }
+}

@@ -1,0 +1,37 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@ovh/registry/registry.pkl"
+import "@ovh/registry/oidc_registry.pkl"
+
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  // Registry for OIDC configuration
+  local testRegistry = new registry.Registry {
+    label = "plugin-sdk-test-regoidc-registry"
+    serviceName = v.serviceName
+    name = "formae-oidc-\(v.testRunID)"
+    region = v.region
+  }
+  testRegistry
+
+  new oidc_registry.Oidc {
+    label = "plugin-sdk-test-registryoidc"
+    serviceName = v.serviceName
+    registryId = testRegistry.res.id
+    oidcName = "formae-test-oidc"
+    oidcEndpoint = "https://auth.example.com/realms/formae-test"
+    oidcClientId = "formae-registry-client"
+    oidcClientSecret = "formae-test-secret-value"
+    oidcScope = "openid,profile,email,offline_access"
+  }
+}

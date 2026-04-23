@@ -1,0 +1,71 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@ovh/database/service.pkl"
+import "@ovh/database/database.pkl"
+import "@ovh/database/user.pkl"
+import "@ovh/database/postgresql_connection_pool.pkl"
+
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  // PostgreSQL service
+  local pgService = new service.Service {
+    label = "plugin-sdk-test-connpool-service"
+    serviceName = v.serviceName
+    engine = "postgresql"
+    version = "14"
+    plan = "essential"
+    flavor = "db1-4"
+    nodes {
+      new service.Node {
+        region = v.region
+      }
+    }
+  }
+  pgService
+
+  // Database for the connection pool
+  local pgDatabase = new database.Database {
+    label = "plugin-sdk-test-connpool-db"
+    serviceName = v.serviceName
+    engine = "postgresql"
+    clusterId = pgService.res.id
+    name = "formae_pool_\(v.testRunID)"
+  }
+  pgDatabase
+
+  // User for the connection pool
+  local pgUser = new user.User {
+    label = "plugin-sdk-test-connpool-user"
+    serviceName = v.serviceName
+    engine = "postgresql"
+    clusterId = pgService.res.id
+    name = "formaepool\(v.testRunID)"
+    roles {
+      new user.Role {
+        name = "login"
+      }
+    }
+  }
+  pgUser
+
+  new postgresql_connection_pool.ConnectionPool {
+    label = "plugin-sdk-test-postgresqlconnectionpool"
+    serviceName = v.serviceName
+    clusterId = pgService.res.id
+    name = "formae-pool-\(v.testRunID)"
+    databaseId = pgDatabase.res.id
+    userId = pgUser.res.id
+    mode = "transaction"
+    size = 10
+  }
+}
