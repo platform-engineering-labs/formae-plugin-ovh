@@ -53,10 +53,20 @@ func extractProjectFromAdditional(targetConfig json.RawMessage, additionalProps 
 	return ""
 }
 
-// filterProps returns a copy of props without the specified keys
+// formaeMetadataFields are the fields that Formae attaches to every Resource
+// and are not valid properties on OVH API request bodies. OVH rejects unknown
+// parameters with 400 `Unknown parameter`, so these must be stripped from any
+// POST/PUT body.
+var formaeMetadataFields = []string{"label", "group", "target", "stack", "managed"}
+
+// filterProps returns a copy of props with Formae metadata fields and the
+// caller-specified keys removed. Nil values are also dropped.
 func filterProps(props map[string]interface{}, keys ...string) map[string]interface{} {
 	result := make(map[string]interface{})
 	keySet := make(map[string]bool)
+	for _, k := range formaeMetadataFields {
+		keySet[k] = true
+	}
 	for _, k := range keys {
 		keySet[k] = true
 	}

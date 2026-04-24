@@ -117,40 +117,48 @@ open class Cluster extends formae.Resource {
   serviceName: String
 
   /// Cluster name
+  @ovh.FieldHint { required = true }
   name: String?
 
   /// Region where the cluster is deployed
   @ovh.FieldHint { required = true; createOnly = true }
   region: String
 
-  /// Kubernetes version (e.g., "1.28")
-  version: String?
+  /// Kubernetes version (e.g., "1.33").
+  ///
+  /// Accepts a bare String or a `formae.Value` so callers can use
+  /// `new formae.Value { value = "1.33"; strategy = "SetOnce" }` when targeting
+  /// a minor version — OVH picks the current patch (e.g. returns "1.33.10-1")
+  /// and SetOnce tells the renderer not to re-compare the value on read.
+  @ovh.FieldHint { required = true }
+  version: (String|formae.Value)?
 
   /// Cluster plan (empty for default)
-  @ovh.FieldHint { createOnly = true }
+  @ovh.FieldHint { createOnly = true; hasProviderDefault = true }
   plan: String?
 
   /// Update policy for the cluster
+  @ovh.FieldHint
   updatePolicy: UpdatePolicy?
 
   /// Kube-proxy mode
-  @ovh.FieldHint { createOnly = true }
+  @ovh.FieldHint { createOnly = true; hasProviderDefault = true }
   kubeProxyMode: KubeProxyMode?
 
   /// Private network ID (OpenStack network UUID)
-  @ovh.FieldHint { createOnly = true }
+  @ovh.FieldHint { createOnly = true; hasProviderDefault = true }
   privateNetworkId: (String|formae.Resolvable)?
 
   /// Private network configuration
-  @ovh.FieldHint { createOnly = true }
+  @ovh.FieldHint { createOnly = true; hasProviderDefault = true }
   privateNetworkConfiguration: PrivateNetworkConfiguration?
 
   /// Subnet ID for load balancers
-  @ovh.FieldHint { createOnly = true }
+  @ovh.FieldHint { createOnly = true; hasProviderDefault = true }
   loadBalancersSubnetId: (String|formae.Resolvable)?
 
   /// Subnet ID for nodes
-  @ovh.FieldHint { createOnly = true }
+  @ovh.FieldHint { createOnly = true; hasProviderDefault = true }
   nodesSubnetId: (String|formae.Resolvable)?
 
   /// API server customization
@@ -160,37 +168,39 @@ open class Cluster extends formae.Resource {
   customizationKubeProxy: KubeProxyCustomization?
 
   // === Computed/Output fields ===
+  // All have hasProviderDefault = true so conformance Verify doesn't require
+  // them in testdata — they're populated by OVH and returned via Read.
 
   /// Cluster ID
-  @ovh.FieldHint 
+  @ovh.FieldHint { hasProviderDefault = true }
   id: String?
 
   /// Cluster status
-  @ovh.FieldHint 
+  @ovh.FieldHint { hasProviderDefault = true }
   status: ClusterStatus?
 
   /// Kubernetes API URL
-  @ovh.FieldHint 
+  @ovh.FieldHint { hasProviderDefault = true }
   url: String?
 
   /// Nodes URL
-  @ovh.FieldHint 
+  @ovh.FieldHint { hasProviderDefault = true }
   nodesUrl: String?
 
   /// Whether the cluster is up to date
-  @ovh.FieldHint 
+  @ovh.FieldHint { hasProviderDefault = true }
   isUpToDate: Boolean?
 
   /// Whether the control plane is up to date
-  @ovh.FieldHint 
+  @ovh.FieldHint { hasProviderDefault = true }
   controlPlaneIsUpToDate: Boolean?
 
   /// Available upgrade versions
-  @ovh.FieldHint 
+  @ovh.FieldHint { hasProviderDefault = true }
   nextUpgradeVersions: Listing<String>?
 
   /// Kubeconfig for cluster access (base64 encoded)
-  @ovh.FieldHint 
+  @ovh.FieldHint { hasProviderDefault = true }
   kubeconfig: String?
 
   hidden res: ClusterResolvable = new {

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/platform-engineering-labs/formae/pkg/plugin"
 	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 	"github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/prov"
 	"github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/registry"
@@ -27,6 +28,8 @@ type clusterProvisioner struct {
 var _ prov.Provisioner = &clusterProvisioner{}
 
 func (p *clusterProvisioner) Create(ctx context.Context, request *resource.CreateRequest) (*resource.CreateResult, error) {
+	log := plugin.LoggerFromContext(ctx)
+
 	var props map[string]interface{}
 	if err := json.Unmarshal(request.Properties, &props); err != nil {
 		return createFailure(resource.OperationErrorCodeInvalidRequest,
@@ -42,8 +45,12 @@ func (p *clusterProvisioner) Create(ctx context.Context, request *resource.Creat
 	// Build URL: POST /cloud/project/{project}/kube
 	url := fmt.Sprintf("/cloud/project/%s/kube", project)
 
-	// Strip serviceName from body (it's in the URL)
-	body := filterProps(props, "serviceName")
+	// Strip serviceName (URL-only) and output-only fields that OVH rejects on POST.
+	body := filterProps(props, "serviceName",
+		"id", "status", "url", "nodesUrl", "isUpToDate",
+		"controlPlaneIsUpToDate", "nextUpgradeVersions", "kubeconfig")
+
+	log.Debug("kube cluster create request", "url", url, "body", body)
 
 	response, err := p.client.Do(ctx, ovhtransport.RequestOptions{
 		Method: "POST",
@@ -51,6 +58,7 @@ func (p *clusterProvisioner) Create(ctx context.Context, request *resource.Creat
 		Body:   body,
 	})
 	if err != nil {
+		log.Debug("kube cluster create failed", "error", err.Error())
 		return handleTransportError(err), nil
 	}
 
@@ -116,9 +124,16 @@ func (p *clusterProvisioner) Update(ctx context.Context, request *resource.Updat
 
 	url := fmt.Sprintf("/cloud/project/%s/kube/%s", project, kubeID)
 
-	// Strip immutable fields
-	body := filterProps(props, "serviceName", "region", "plan", "kubeProxyMode",
-		"privateNetworkId", "privateNetworkConfiguration", "loadBalancersSubnetId", "nodesSubnetId")
+	// Strip immutable + output-only fields. OVH's PUT /kube/{id} accepts name
+	// and updatePolicy; everything else gets rejected as "Unknown parameter".
+	body := filterProps(props, "serviceName", "region", "version", "plan", "kubeProxyMode",
+		"privateNetworkId", "privateNetworkConfiguration", "loadBalancersSubnetId", "nodesSubnetId",
+		"id", "status", "url", "nodesUrl", "isUpToDate",
+		"controlPlaneIsUpToDate", "nextUpgradeVersions", "kubeconfig",
+		"customizationApiserver", "customizationKubeProxy")
+
+	log := plugin.LoggerFromContext(ctx)
+	log.Debug("kube cluster update request", "url", url, "body", body)
 
 	response, err := p.client.Do(ctx, ovhtransport.RequestOptions{
 		Method: "PUT",
@@ -126,6 +141,7 @@ func (p *clusterProvisioner) Update(ctx context.Context, request *resource.Updat
 		Body:   body,
 	})
 	if err != nil {
+		log.Debug("kube cluster update failed", "error", err.Error())
 		if transportErr, ok := err.(*ovhtransport.Error); ok {
 			return updateFailure(request.NativeID, ovhtransport.ToResourceErrorCode(transportErr.Code),
 				transportErr.Message), nil
