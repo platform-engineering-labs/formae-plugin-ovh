@@ -37,3 +37,6 @@ dist/
 PklProject.deps.json
 CLAUDE.md
 .claude/
+
+# Worktrees
+.worktrees/
