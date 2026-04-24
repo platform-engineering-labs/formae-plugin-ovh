@@ -46,6 +46,8 @@ func init() {
 				SupportsUpdate: true,
 				UpdateMethod:   base.UpdateMethodPut,
 			},
+			RequestTransformer:  recordRequestTransformer,
+			ResponseTransformer: recordResponseTransformer,
 			Operations: []resource.Operation{
 				resource.OperationCreate,
 				resource.OperationRead,
@@ -64,6 +66,8 @@ func init() {
 				SupportsUpdate: true,
 				UpdateMethod:   base.UpdateMethodPut,
 			},
+			RequestTransformer:  redirectionRequestTransformer,
+			ResponseTransformer: redirectionResponseTransformer,
 			Operations: []resource.Operation{
 				resource.OperationCreate,
 				resource.OperationRead,

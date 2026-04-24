@@ -1,0 +1,25 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@ovh/dns/record.pkl" as dnsRecord
+
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new dnsRecord.Record {
+    label = "plugin-sdk-test-dnsrecord"
+    zone = v.dnsZone
+    subDomain = "formae-test-\(v.testRunID)"
+    fieldType = "TXT" // createOnly change forces replacement
+    recordTarget = "v=formae-test"
+    ttl = 300
+  }
+}
