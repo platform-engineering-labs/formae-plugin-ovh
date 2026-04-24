@@ -90,25 +90,23 @@ setup-credentials:
 clean-environment:
 	@./scripts/ci/clean-environment.sh
 
+# Normalize TIMEOUT: bare digits (legacy minutes form) get "m" appended.
+TEST_TIMEOUT := $(if $(TIMEOUT),$(if $(shell echo $(TIMEOUT) | grep -E '^[0-9]+$$'),$(TIMEOUT)m,$(TIMEOUT)),30m)
+
 ## conformance-test: Run all conformance tests (CRUD + discovery)
-## Usage: make conformance-test [VERSION=0.80.0] [TEST=s3-bucket] [TIMEOUT=15]
-## Downloads the specified formae version (or latest) and runs conformance tests.
-## Calls setup-credentials and clean-environment automatically.
-##
-## Parameters:
-##   VERSION - Formae version to test against (default: latest)
-##   TEST    - Filter tests by name pattern (e.g., TEST=s3-bucket)
-##   TIMEOUT - Timeout in minutes for long-running operations (default: 5)
+## Usage: make conformance-test [TEST=s3-bucket] [TIMEOUT=30m]
+## Calls clean-environment before and after tests.
 conformance-test: conformance-test-crud conformance-test-discovery
 
 ## conformance-test-crud: Run only CRUD lifecycle tests
-## Usage: make conformance-test-crud [VERSION=0.80.0] [TEST=s3-bucket] [TIMEOUT=15]
+## Usage: make conformance-test-crud [TEST=s3-bucket] [TIMEOUT=30m]
 conformance-test-crud: install setup-credentials
 	@echo "Pre-test cleanup..."
 	@./scripts/ci/clean-environment.sh || true
 	@echo ""
 	@echo "Running CRUD conformance tests..."
-	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=crud FORMAE_TEST_TIMEOUT="$(TIMEOUT)" ./scripts/run-conformance-tests.sh $(VERSION); \
+	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=crud \
+		$(GO) test -tags=conformance -v -timeout $(TEST_TIMEOUT) ./...; \
 	TEST_EXIT=$$?; \
 	echo ""; \
 	echo "Post-test cleanup..."; \
@@ -116,13 +114,14 @@ conformance-test-crud: install setup-credentials
 	exit $$TEST_EXIT
 
 ## conformance-test-discovery: Run only discovery tests
-## Usage: make conformance-test-discovery [VERSION=0.80.0] [TEST=s3-bucket] [TIMEOUT=15]
+## Usage: make conformance-test-discovery [TEST=s3-bucket] [TIMEOUT=30m]
 conformance-test-discovery: install setup-credentials
 	@echo "Pre-test cleanup..."
 	@./scripts/ci/clean-environment.sh || true
 	@echo ""
 	@echo "Running discovery conformance tests..."
-	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=discovery FORMAE_TEST_TIMEOUT="$(TIMEOUT)" ./scripts/run-conformance-tests.sh $(VERSION); \
+	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=discovery \
+		$(GO) test -tags=conformance -v -timeout $(TEST_TIMEOUT) ./...; \
 	TEST_EXIT=$$?; \
 	echo ""; \
 	echo "Post-test cleanup..."; \
@@ -133,10 +132,12 @@ conformance-test-discovery: install setup-credentials
 ## Used by CI matrix jobs where cleanup is managed separately.
 conformance-test-crud-run:
 	@echo "Running CRUD conformance tests..."
-	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=crud FORMAE_TEST_TIMEOUT="$(TIMEOUT)" ./scripts/run-conformance-tests.sh $(VERSION)
+	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=crud \
+		$(GO) test -tags=conformance -v -timeout $(TEST_TIMEOUT) ./...
 
 ## conformance-test-discovery-run: Run only discovery tests (no cleanup)
 ## Used by CI matrix jobs where cleanup is managed separately.
 conformance-test-discovery-run:
 	@echo "Running discovery conformance tests..."
-	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=discovery FORMAE_TEST_TIMEOUT="$(TIMEOUT)" ./scripts/run-conformance-tests.sh $(VERSION)
+	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=discovery \
+		$(GO) test -tags=conformance -v -timeout $(TEST_TIMEOUT) ./...
