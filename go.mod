@@ -3,7 +3,7 @@ module github.com/platform-engineering-labs/formae-plugin-ovh
 go 1.26.0
 
 require (
-	github.com/gophercloud/gophercloud/v2 v2.10.0
+	github.com/gophercloud/gophercloud/v2 v2.12.0
 	github.com/ovh/go-ovh v1.9.0
 	github.com/platform-engineering-labs/formae/pkg/model v0.1.23
 	github.com/platform-engineering-labs/formae/pkg/plugin v0.2.2-0.20260425033718-2ccb40eaf779
@@ -87,7 +87,7 @@ require (
 	golang.org/x/net v0.49.0 // indirect
 	golang.org/x/oauth2 v0.34.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.40.0 // indirect
+	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/text v0.33.0 // indirect
 	golang.org/x/tools v0.40.0 // indirect
 	gonum.org/v1/gonum v0.17.0 // indirect
