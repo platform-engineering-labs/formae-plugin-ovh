@@ -260,14 +260,25 @@ func (p *nodePoolProvisioner) Status(ctx context.Context, request *resource.Stat
 		return statusFailure(request, resource.OperationErrorCodeServiceInternalError, err.Error()), nil
 	}
 
-	// Check if node pool is READY
+	// Treat error states as terminal failures so polling stops; otherwise
+	// READY = success and any transient state (INSTALLING/RESIZING/...) keeps polling.
 	status, _ := response.Body["status"].(string)
-	if status != "READY" {
+	currentNodes, _ := response.Body["currentNodes"].(float64)
+	desiredNodes, _ := response.Body["desiredNodes"].(float64)
+	plugin.LoggerFromContext(ctx).Debug("kube nodepool status poll",
+		"status", status, "currentNodes", currentNodes, "desiredNodes", desiredNodes)
+	switch status {
+	case "ERROR", "USER_ERROR", "USER_QUOTA_ERROR", "USER_NODE_NOT_FOUND_ERROR", "USER_NODE_SUSPENDED_SERVICE":
+		return statusFailure(request, resource.OperationErrorCodeServiceInternalError,
+			fmt.Sprintf("NodePool entered error state: %s", status)), nil
+	case "READY":
+		// fall through to success path below
+	default:
 		return &resource.StatusResult{
 			ProgressResult: &resource.ProgressResult{
 				Operation:       resource.OperationCheckStatus,
 				OperationStatus: resource.OperationStatusInProgress,
-				StatusMessage:   fmt.Sprintf("NodePool status: %s", status),
+				StatusMessage:   fmt.Sprintf("NodePool status: %s (%.0f/%.0f nodes)", status, currentNodes, desiredNodes),
 				RequestID:       request.RequestID,
 				NativeID:        request.NativeID,
 			},
