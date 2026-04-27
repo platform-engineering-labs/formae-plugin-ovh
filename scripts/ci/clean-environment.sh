@@ -65,6 +65,32 @@ ovh_api() {
     curl "${curl_args[@]}" "${url}"
 }
 
+# ---- OVH API: Clean Kubernetes clusters ----
+# Managed Kubernetes clusters are not visible through OpenStack — they have
+# their own OVH-side endpoints. Delete them before private networks since a
+# cluster may attach to a private network.
+if [[ -n "${OVH_APPLICATION_KEY:-}" && -n "${OVH_CLOUD_PROJECT_ID:-}" ]]; then
+    echo "Cleaning OVH Kubernetes clusters via OVH API..."
+    raw_response=$(ovh_api GET "/cloud/project/${OVH_CLOUD_PROJECT_ID}/kube" 2>/dev/null || true)
+    if echo "${raw_response}" | jq empty 2>/dev/null; then
+        kube_ids=$(echo "${raw_response}" | jq -r '.[] // empty' 2>/dev/null || true)
+    else
+        echo "  Warning: OVH API returned unexpected response: ${raw_response:0:200}"
+        kube_ids=""
+    fi
+    if [[ -n "${kube_ids}" ]]; then
+        echo "${kube_ids}" | while read -r kube_id; do
+            [[ -z "${kube_id}" ]] && continue
+            echo "  Deleting OVH kube cluster: ${kube_id}"
+            ovh_api DELETE "/cloud/project/${OVH_CLOUD_PROJECT_ID}/kube/${kube_id}" 2>/dev/null || echo "  Warning: Failed to delete ${kube_id}"
+        done
+    else
+        echo "  No OVH kube clusters found"
+    fi
+else
+    echo "Skipping OVH kube cluster cleanup (OVH API credentials not set)"
+fi
+
 # ---- OVH API: Clean private networks ----
 # OVH private networks are NOT visible through OpenStack Neutron,
 # so we must clean them via the OVH REST API.

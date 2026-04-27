@@ -40,9 +40,6 @@ open class IpRestriction extends formae.Resource {
   @ovh.FieldHint { required = true; createOnly = true }
   ip: String
 
-  /// Description of this IP restriction
-  description: String?
-
   hidden res: IpRestrictionResolvable = new {
     label = parent.label
     stack = parent.stack?.label

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/platform-engineering-labs/formae/pkg/plugin"
 	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 	"github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/prov"
 	"github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/registry"
@@ -87,11 +88,14 @@ func (p *nodePoolProvisioner) Read(ctx context.Context, request *resource.ReadRe
 
 	url := fmt.Sprintf("/cloud/project/%s/kube/%s/nodepool/%s", project, kubeID, nodePoolID)
 
+	log := plugin.LoggerFromContext(ctx)
+
 	response, err := p.client.Do(ctx, ovhtransport.RequestOptions{
 		Method: "GET",
 		Path:   url,
 	})
 	if err != nil {
+		log.Debug("kube nodepool read error", "err", err)
 		if transportErr, ok := err.(*ovhtransport.Error); ok {
 			return &resource.ReadResult{
 				ErrorCode: ovhtransport.ToResourceErrorCode(transportErr.Code),
@@ -100,6 +104,7 @@ func (p *nodePoolProvisioner) Read(ctx context.Context, request *resource.ReadRe
 		return &resource.ReadResult{ErrorCode: resource.OperationErrorCodeServiceInternalError}, nil
 	}
 
+	log.Debug("kube nodepool read response", "body", response.Body)
 	propsJSON, _ := json.Marshal(response.Body)
 	return &resource.ReadResult{Properties: string(propsJSON)}, nil
 }
@@ -122,25 +127,30 @@ func (p *nodePoolProvisioner) Update(ctx context.Context, request *resource.Upda
 	body := filterProps(props, "serviceName", "kubeId", "name", "flavorName",
 		"antiAffinity", "monthlyBilled", "availabilityZones")
 
+	log := plugin.LoggerFromContext(ctx)
+	log.Debug("kube nodepool update request", "url", url, "body", body)
+
 	response, err := p.client.Do(ctx, ovhtransport.RequestOptions{
 		Method: "PUT",
 		Path:   url,
 		Body:   body,
 	})
 	if err != nil {
+		log.Debug("kube nodepool update error", "err", err)
 		if transportErr, ok := err.(*ovhtransport.Error); ok {
 			return updateFailure(request.NativeID, ovhtransport.ToResourceErrorCode(transportErr.Code),
 				transportErr.Message), nil
 		}
 		return updateFailure(request.NativeID, resource.OperationErrorCodeServiceInternalError, err.Error()), nil
 	}
+	log.Debug("kube nodepool update response", "body", response.Body)
 
 	propsJSON, _ := json.Marshal(response.Body)
 
 	return &resource.UpdateResult{
 		ProgressResult: &resource.ProgressResult{
 			Operation:          resource.OperationUpdate,
-			OperationStatus:    resource.OperationStatusSuccess,
+			OperationStatus:    resource.OperationStatusInProgress,
 			NativeID:           request.NativeID,
 			ResourceProperties: propsJSON,
 		},
@@ -176,10 +186,13 @@ func (p *nodePoolProvisioner) Delete(ctx context.Context, request *resource.Dele
 		return deleteFailure(request.NativeID, resource.OperationErrorCodeServiceInternalError, err.Error()), nil
 	}
 
+	// OVH node pool DELETE is async: the pool enters DELETING state until VMs
+	// are torn down. Return InProgress so Status polling waits until OVH
+	// returns 404 before the parent cluster delete fires.
 	return &resource.DeleteResult{
 		ProgressResult: &resource.ProgressResult{
 			Operation:       resource.OperationDelete,
-			OperationStatus: resource.OperationStatusSuccess,
+			OperationStatus: resource.OperationStatusInProgress,
 			NativeID:        request.NativeID,
 		},
 	}, nil
@@ -227,6 +240,20 @@ func (p *nodePoolProvisioner) Status(ctx context.Context, request *resource.Stat
 	})
 	if err != nil {
 		if transportErr, ok := err.(*ovhtransport.Error); ok {
+			// 404 means the node pool is gone — terminal success state for a
+			// delete poll. For create/update polls this shouldn't happen, but
+			// returning Success is still the right signal: the resource that
+			// formae was tracking no longer exists, so further polling is moot.
+			if transportErr.Code == ovhtransport.ErrorCodeResourceNotFound {
+				return &resource.StatusResult{
+					ProgressResult: &resource.ProgressResult{
+						Operation:       resource.OperationCheckStatus,
+						OperationStatus: resource.OperationStatusSuccess,
+						RequestID:       request.RequestID,
+						NativeID:        request.NativeID,
+					},
+				}, nil
+			}
 			return statusFailure(request, ovhtransport.ToResourceErrorCode(transportErr.Code),
 				transportErr.Message), nil
 		}

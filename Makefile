@@ -93,19 +93,29 @@ clean-environment:
 # Normalize TIMEOUT: bare digits (legacy minutes form) get "m" appended.
 TEST_TIMEOUT := $(if $(TIMEOUT),$(if $(shell echo $(TIMEOUT) | grep -E '^[0-9]+$$'),$(TIMEOUT)m,$(TIMEOUT)),30m)
 
+# OVH managed Kubernetes provisions in 2-3 min and tears down over a similar
+# window with a REDEPLOYING pause whenever a sub-resource (OIDC, ipRestrictions)
+# is added or removed. We default both OOB timeouts to 5 min — comfortably above
+# any single OVH operation we exercise, and tight enough that a real hang fails
+# fast instead of consuming the framework's 30m default.
+OOB_TIMEOUT ?= 5
+OOB_DELETE_TIMEOUT ?= 5
+KUBE_TEST_ENV := $(if $(OOB_TIMEOUT),FORMAE_TEST_OOB_TIMEOUT=$(OOB_TIMEOUT)) \
+	$(if $(OOB_DELETE_TIMEOUT),FORMAE_TEST_OOB_DELETE_TIMEOUT=$(OOB_DELETE_TIMEOUT))
+
 ## conformance-test: Run all conformance tests (CRUD + discovery)
-## Usage: make conformance-test [TEST=s3-bucket] [TIMEOUT=30m]
+## Usage: make conformance-test [TEST=s3-bucket] [TIMEOUT=30m] [OOB_TIMEOUT=30] [OOB_DELETE_TIMEOUT=2]
 ## Calls clean-environment before and after tests.
 conformance-test: conformance-test-crud conformance-test-discovery
 
 ## conformance-test-crud: Run only CRUD lifecycle tests
-## Usage: make conformance-test-crud [TEST=s3-bucket] [TIMEOUT=30m]
+## Usage: make conformance-test-crud [TEST=s3-bucket] [TIMEOUT=30m] [OOB_TIMEOUT=30] [OOB_DELETE_TIMEOUT=2]
 conformance-test-crud: install setup-credentials
 	@echo "Pre-test cleanup..."
 	@./scripts/ci/clean-environment.sh || true
 	@echo ""
 	@echo "Running CRUD conformance tests..."
-	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=crud \
+	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=crud $(KUBE_TEST_ENV) \
 		$(GO) test -tags=conformance -v -timeout $(TEST_TIMEOUT) ./...; \
 	TEST_EXIT=$$?; \
 	echo ""; \
@@ -114,13 +124,13 @@ conformance-test-crud: install setup-credentials
 	exit $$TEST_EXIT
 
 ## conformance-test-discovery: Run only discovery tests
-## Usage: make conformance-test-discovery [TEST=s3-bucket] [TIMEOUT=30m]
+## Usage: make conformance-test-discovery [TEST=s3-bucket] [TIMEOUT=30m] [OOB_TIMEOUT=30]
 conformance-test-discovery: install setup-credentials
 	@echo "Pre-test cleanup..."
 	@./scripts/ci/clean-environment.sh || true
 	@echo ""
 	@echo "Running discovery conformance tests..."
-	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=discovery \
+	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=discovery $(KUBE_TEST_ENV) \
 		$(GO) test -tags=conformance -v -timeout $(TEST_TIMEOUT) ./...; \
 	TEST_EXIT=$$?; \
 	echo ""; \
@@ -132,12 +142,12 @@ conformance-test-discovery: install setup-credentials
 ## Used by CI matrix jobs where cleanup is managed separately.
 conformance-test-crud-run:
 	@echo "Running CRUD conformance tests..."
-	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=crud \
+	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=crud $(KUBE_TEST_ENV) \
 		$(GO) test -tags=conformance -v -timeout $(TEST_TIMEOUT) ./...
 
 ## conformance-test-discovery-run: Run only discovery tests (no cleanup)
 ## Used by CI matrix jobs where cleanup is managed separately.
 conformance-test-discovery-run:
 	@echo "Running discovery conformance tests..."
-	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=discovery \
+	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=discovery $(KUBE_TEST_ENV) \
 		$(GO) test -tags=conformance -v -timeout $(TEST_TIMEOUT) ./...
