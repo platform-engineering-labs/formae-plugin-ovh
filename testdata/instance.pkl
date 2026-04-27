@@ -31,7 +31,7 @@ forma {
   local testSubnet = new privatesubnet.PrivateSubnet {
     label = "plugin-sdk-test-instance-subnet"
     region = v.region
-    network_id = testNetwork.res.id
+    networkId = testNetwork.res.id
     network = "10.0.1.0/24"
     dhcp = true
     noGateway = false
@@ -48,7 +48,7 @@ forma {
     imageId = v.ubuntuImageID
     networks {
       new instance.NetworkParams {
-        networkId = testSubnet.res.network_id // Use subnet resolvable to ensure subnet is created before instance
+        networkId = testSubnet.res.networkId // Use subnet resolvable to ensure subnet is created before instance
       }
     }
   }

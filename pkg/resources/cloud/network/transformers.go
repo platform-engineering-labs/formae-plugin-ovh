@@ -107,16 +107,15 @@ func calculateDefaultAllocationRange(cidr string) (start, end string, err error)
 // subnetPrivateRequestTransformer transforms subnet properties for the private network API.
 // The API at POST /cloud/project/{serviceName}/network/private/{networkId}/subnet
 // expects: network, dhcp, noGateway, start, end, region.
-// Strips network_id (used in URL path).
+// Strips networkId (used in URL path).
 type subnetPrivateRequestTransformer struct{}
 
 func (t *subnetPrivateRequestTransformer) Transform(props map[string]interface{}, ctx base.TransformContext) (map[string]interface{}, error) {
 	result := make(map[string]interface{})
 
-	// Copy all fields except network_id (used in URL path)
+	// Copy all fields except networkId (used in URL path)
 	for k, v := range props {
-		if k == "network_id" {
-			// Used in URL path, not in body
+		if k == "networkId" {
 			continue
 		}
 		result[k] = v

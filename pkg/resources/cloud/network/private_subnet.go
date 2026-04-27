@@ -76,11 +76,11 @@ type PrivateSubnetProvisioner struct {
 	base *base.BaseResource
 }
 
-// Create delegates to BaseResource and re-injects network_id into the
+// Create delegates to BaseResource and re-injects networkId into the
 // returned ResourceProperties. The OVH subnet POST response only echoes
 // {id, cidr, gatewayIp, ipPools[]} — it omits the parent networkId which
 // lives in the URL path. Dependents (e.g. instance.networks[].networkId)
-// resolve `subnet.res.network_id` from these properties; without this
+// resolve `subnet.res.networkId` from these properties; without this
 // re-injection, the resolvable returns nothing and the dependent send
 // fails with HTTP 400 InvalidInput.
 func (p *PrivateSubnetProvisioner) Create(ctx context.Context, request *resource.CreateRequest) (*resource.CreateResult, error) {
@@ -96,7 +96,7 @@ func (p *PrivateSubnetProvisioner) Create(ctx context.Context, request *resource
 	if err := json.Unmarshal(request.Properties, &props); err != nil {
 		return result, nil
 	}
-	networkID, _ := props["network_id"].(string)
+	networkID, _ := props["networkId"].(string)
 	if networkID == "" {
 		return result, nil
 	}
@@ -105,10 +105,10 @@ func (p *PrivateSubnetProvisioner) Create(ctx context.Context, request *resource
 	if err := json.Unmarshal(result.ProgressResult.ResourceProperties, &resp); err != nil {
 		return result, nil
 	}
-	if _, ok := resp["network_id"]; ok {
+	if _, ok := resp["networkId"]; ok {
 		return result, nil
 	}
-	resp["network_id"] = networkID
+	resp["networkId"] = networkID
 	merged, err := json.Marshal(resp)
 	if err != nil {
 		return result, nil
@@ -168,7 +168,7 @@ func (p *PrivateSubnetProvisioner) Read(ctx context.Context, request *resource.R
 		if id, ok := subnet["id"].(string); ok && id == subnetID {
 			// Transform API response to match PKL schema.
 			// API returns: {id, cidr, gatewayIp, ipPools: [{dhcp, end, network, region, start}]}
-			// Schema expects: {id, network_id, region, network, dhcp, noGateway, start, end}
+			// Schema expects: {id, networkId, region, network, dhcp, noGateway, start, end}
 			result := transformSubnetResponse(subnet, networkID)
 
 			propsJSON, err := json.Marshal(result)
@@ -275,7 +275,7 @@ func init() {
 			ParentResource: &base.ParentResourceConfig{
 				RequiresParent: true,
 				ParentType:     "network/private", // Used in URL path
-				PropertyName:   "network_id",
+				PropertyName:   "networkId",
 			},
 			SupportsUpdate: false, // OVH subnets are not updatable
 		},
@@ -312,11 +312,11 @@ func init() {
 
 // transformSubnetResponse maps the OVH API GET response to PKL schema field names.
 // API returns: {id, cidr, gatewayIp, ipPools: [{dhcp, end, network, region, start}]}
-// Schema expects: {id, network_id, region, network, dhcp, noGateway, start, end}
+// Schema expects: {id, networkId, region, network, dhcp, noGateway, start, end}
 func transformSubnetResponse(subnet map[string]interface{}, networkID string) map[string]interface{} {
 	result := map[string]interface{}{
-		"id":         subnet["id"],
-		"network_id": networkID,
+		"id":        subnet["id"],
+		"networkId": networkID,
 	}
 
 	// Derive noGateway from gatewayIp (empty means no gateway)
