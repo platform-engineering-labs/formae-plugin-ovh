@@ -102,12 +102,20 @@ clean-environment:
 # Normalize TIMEOUT: bare digits (legacy minutes form) get "m" appended.
 TEST_TIMEOUT := $(if $(TIMEOUT),$(if $(shell echo $(TIMEOUT) | grep -E '^[0-9]+$$'),$(TIMEOUT)m,$(TIMEOUT)),30m)
 
-# OVH managed Kubernetes provisions in 2-3 min and tears down over a similar
-# window with a REDEPLOYING pause whenever a sub-resource (OIDC, ipRestrictions)
-# is added or removed. We default both OOB timeouts to 5 min — comfortably above
-# any single OVH operation we exercise, and tight enough that a real hang fails
-# fast instead of consuming the framework's 30m default.
-OOB_TIMEOUT ?= 5
+# OVH managed Kubernetes is slow:
+#   - cluster create normally takes 2-3 min, but US-EAST-VA-1 has been observed
+#     to keep a fresh nodepool in INSTALLING for 10-15 min under load
+#   - cluster delete tears the control plane down over a similar window
+#   - the OOB-delete phase recreates a cluster *and* exercises Delete on it, so
+#     two of those windows back-to-back fit inside one OOB plugin RPC
+#
+# OOB_TIMEOUT: bounds a single OOB Create/Delete plugin RPC. 15 min is enough
+# headroom for a slow OVH region without hiding genuine plugin hangs.
+# OOB_DELETE_TIMEOUT: bounds the post-sync inventory tombstone wait. The plugin
+# Delete has already returned by this point; what we wait for here is OVH's GET
+# eventually reflecting the deletion. 5 min covers the worst eventual-consistency
+# delays we have seen.
+OOB_TIMEOUT ?= 15
 OOB_DELETE_TIMEOUT ?= 5
 KUBE_TEST_ENV := $(if $(OOB_TIMEOUT),FORMAE_TEST_OOB_TIMEOUT=$(OOB_TIMEOUT)) \
 	$(if $(OOB_DELETE_TIMEOUT),FORMAE_TEST_OOB_DELETE_TIMEOUT=$(OOB_DELETE_TIMEOUT))
