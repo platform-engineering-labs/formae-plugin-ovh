@@ -39,14 +39,29 @@ func gatewayStatusChecker(resourceData map[string]interface{}) (bool, error) {
 	return status == "ACTIVE", nil
 }
 
-// privateNetworkStatusChecker verifies all regions have ACTIVE status AND
-// have been assigned an openstackId. OVH propagates a private network across
-// its surfaces in two steps: the network shows status=ACTIVE on the
-// /network/private endpoint first, then later gets an openstackId per region
-// when it becomes visible to compute (the instance API rejects the network
-// with "not found" until that second step completes). Both signals must be
-// present before dependents like instances can use the network.
+// privateNetworkStatusChecker verifies the network is fully provisioned.
+// cloud.network.Network has TWO status fields:
+//   - top-level `status` (NetworkStatusEnum: ACTIVE | BUILDING | DELETING |
+//     ERROR) — overall network state.
+//   - `regions[].status` (NetworkRegionStatusEnum) — per-region rollout.
+// Dependents (subnet, instance) can race the network if we only gate on
+// regions[].status reaching ACTIVE — the instance API consults the
+// top-level status and rejects with "network not found" until it flips to
+// ACTIVE. Each region also needs an openstackId before its compute layer
+// can resolve the network. ERROR is terminal.
 func privateNetworkStatusChecker(resourceData map[string]interface{}) (bool, error) {
+	if topStatus, ok := resourceData["status"].(string); ok {
+		switch topStatus {
+		case "ACTIVE":
+			// continue to per-region checks
+		case "ERROR":
+			id, _ := resourceData["id"].(string)
+			return false, fmt.Errorf("private network %s entered ERROR state", id)
+		default:
+			return false, nil
+		}
+	}
+
 	regions, ok := resourceData["regions"].([]interface{})
 	if !ok {
 		return true, nil
