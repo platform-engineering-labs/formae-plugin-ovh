@@ -70,16 +70,43 @@ func privateNetworkStatusChecker(resourceData map[string]interface{}) (bool, err
 	return true, nil
 }
 
-// privateNetworkReadinessProbe verifies the network is visible on the subnet
-// API endpoint. OVH has eventual consistency between the network and subnet
-// endpoints — a network can be ACTIVE on its own endpoint but not yet visible
-// when creating subnets. This probe hits the subnet list endpoint to confirm.
+// privateNetworkReadinessProbe verifies the network is visible on the
+// surfaces that dependent resources actually call:
+//   - /network/private/{id}/subnet  — subnets are created here.
+//   - /region/{r}/network/{id}      — the regional/Neutron view that the
+//     instance API consults; staying on /network/private alone leads to
+//     "network <id> not found" responses from POST /instance even after
+//     the network reports status=ACTIVE with an openstackId.
+// We re-fetch the network to learn its regions, then probe each one.
 func privateNetworkReadinessProbe(ctx context.Context, client base.TransportClient, pathCtx base.PathContext) (bool, error) {
-	url := fmt.Sprintf("/cloud/project/%s/network/private/%s/subnet", pathCtx.Project, pathCtx.ResourceName)
-	_, err := client.Do(ctx, ovhtransport.RequestOptions{Method: "GET", Path: url})
-	if err != nil {
-		// Network not yet visible on subnet endpoint
+	subnetURL := fmt.Sprintf("/cloud/project/%s/network/private/%s/subnet", pathCtx.Project, pathCtx.ResourceName)
+	if _, err := client.Do(ctx, ovhtransport.RequestOptions{Method: "GET", Path: subnetURL}); err != nil {
 		return false, nil
+	}
+
+	netURL := fmt.Sprintf("/cloud/project/%s/network/private/%s", pathCtx.Project, pathCtx.ResourceName)
+	netResp, err := client.Do(ctx, ovhtransport.RequestOptions{Method: "GET", Path: netURL})
+	if err != nil {
+		return false, nil
+	}
+
+	regionsRaw, _ := netResp.Body["regions"].([]interface{})
+	if len(regionsRaw) == 0 {
+		return false, nil
+	}
+	for _, r := range regionsRaw {
+		regionObj, ok := r.(map[string]interface{})
+		if !ok {
+			return false, nil
+		}
+		regionName, _ := regionObj["region"].(string)
+		if regionName == "" {
+			return false, nil
+		}
+		regionalURL := fmt.Sprintf("/cloud/project/%s/region/%s/network/%s", pathCtx.Project, regionName, pathCtx.ResourceName)
+		if _, err := client.Do(ctx, ovhtransport.RequestOptions{Method: "GET", Path: regionalURL}); err != nil {
+			return false, nil
+		}
 	}
 	return true, nil
 }
