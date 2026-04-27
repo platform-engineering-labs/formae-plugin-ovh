@@ -109,16 +109,21 @@ TEST_TIMEOUT := $(if $(TIMEOUT),$(if $(shell echo $(TIMEOUT) | grep -E '^[0-9]+$
 #   - the OOB-delete phase recreates a cluster *and* exercises Delete on it, so
 #     two of those windows back-to-back fit inside one OOB plugin RPC
 #
+# FORMAE_TIMEOUT: bounds the framework's per-operation wait
+# (PollStatus / WaitForResourceCompletion). Default 15 min — kube cluster
+# create+nodepool-installing has been observed at 10-12 min on US-EAST-VA-1.
 # OOB_TIMEOUT: bounds a single OOB Create/Delete plugin RPC. 15 min is enough
 # headroom for a slow OVH region without hiding genuine plugin hangs.
 # OOB_DELETE_TIMEOUT: bounds the post-sync inventory tombstone wait. The plugin
 # Delete has already returned by this point; what we wait for here is OVH's GET
-# eventually reflecting the deletion. 5 min covers the worst eventual-consistency
-# delays we have seen.
+# eventually reflecting the deletion — for kube clusters that is 5-10 min.
+FORMAE_TIMEOUT ?= 15
 OOB_TIMEOUT ?= 15
-OOB_DELETE_TIMEOUT ?= 5
-KUBE_TEST_ENV := $(if $(OOB_TIMEOUT),FORMAE_TEST_OOB_TIMEOUT=$(OOB_TIMEOUT)) \
-	$(if $(OOB_DELETE_TIMEOUT),FORMAE_TEST_OOB_DELETE_TIMEOUT=$(OOB_DELETE_TIMEOUT))
+OOB_DELETE_TIMEOUT ?= 10
+KUBE_TEST_ENV := FORMAE_TEST_TIMEOUT=$(FORMAE_TIMEOUT) \
+	$(if $(OOB_TIMEOUT),FORMAE_TEST_OOB_TIMEOUT=$(OOB_TIMEOUT)) \
+	$(if $(OOB_DELETE_TIMEOUT),FORMAE_TEST_OOB_DELETE_TIMEOUT=$(OOB_DELETE_TIMEOUT)) \
+	FORMAE_LOG_PLUGINS=debug
 
 ## conformance-test: Run all conformance tests (CRUD + discovery)
 ## Usage: make conformance-test [TEST=s3-bucket] [TIMEOUT=30m] [OOB_TIMEOUT=30] [OOB_DELETE_TIMEOUT=2]

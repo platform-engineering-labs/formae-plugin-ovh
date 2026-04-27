@@ -248,6 +248,7 @@ func (p *oidcProvisioner) Status(ctx context.Context, request *resource.StatusRe
 	}
 
 	clusterURL := fmt.Sprintf("/cloud/project/%s/kube/%s", project, kubeID)
+	log := plugin.LoggerFromContext(ctx)
 	response, err := p.client.Do(ctx, ovhtransport.RequestOptions{
 		Method: "GET",
 		Path:   clusterURL,
@@ -266,10 +267,20 @@ func (p *oidcProvisioner) Status(ctx context.Context, request *resource.StatusRe
 					},
 				}, nil
 			}
-			return statusFailure(request, ovhtransport.ToResourceErrorCode(transportErr.Code),
-				transportErr.Message), nil
 		}
-		return statusFailure(request, resource.OperationErrorCodeServiceInternalError, err.Error()), nil
+		// Any other transport error (5xx, network blip, OVH rate-limit) while
+		// the cluster is mid-REDEPLOYING is transient — keep polling instead
+		// of failing the whole Update/Create command.
+		log.Debug("kube oidc status: cluster GET transient error, retrying", "err", err)
+		return &resource.StatusResult{
+			ProgressResult: &resource.ProgressResult{
+				Operation:       resource.OperationCheckStatus,
+				OperationStatus: resource.OperationStatusInProgress,
+				StatusMessage:   fmt.Sprintf("transient cluster GET error: %v", err),
+				RequestID:       request.RequestID,
+				NativeID:        request.NativeID,
+			},
+		}, nil
 	}
 
 	clusterStatus, _ := response.Body["status"].(string)
