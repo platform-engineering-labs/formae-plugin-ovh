@@ -39,12 +39,16 @@ func gatewayStatusChecker(resourceData map[string]interface{}) (bool, error) {
 	return status == "ACTIVE", nil
 }
 
-// privateNetworkStatusChecker verifies all regions have ACTIVE status.
-// OVH private networks require region activation before subnets can be created.
+// privateNetworkStatusChecker verifies all regions have ACTIVE status AND
+// have been assigned an openstackId. OVH propagates a private network across
+// its surfaces in two steps: the network shows status=ACTIVE on the
+// /network/private endpoint first, then later gets an openstackId per region
+// when it becomes visible to compute (the instance API rejects the network
+// with "not found" until that second step completes). Both signals must be
+// present before dependents like instances can use the network.
 func privateNetworkStatusChecker(resourceData map[string]interface{}) (bool, error) {
 	regions, ok := resourceData["regions"].([]interface{})
 	if !ok {
-		// No regions field or not an array - consider ready
 		return true, nil
 	}
 
@@ -55,12 +59,14 @@ func privateNetworkStatusChecker(resourceData map[string]interface{}) (bool, err
 		}
 		status, _ := region["status"].(string)
 		if status != "ACTIVE" {
-			// At least one region is not yet active
+			return false, nil
+		}
+		openstackID, _ := region["openstackId"].(string)
+		if openstackID == "" {
 			return false, nil
 		}
 	}
 
-	// All regions are active
 	return true, nil
 }
 
