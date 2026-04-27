@@ -113,33 +113,21 @@ conformance-test: conformance-test-crud conformance-test-discovery
 
 ## conformance-test-crud: Run only CRUD lifecycle tests
 ## Usage: make conformance-test-crud [TEST=s3-bucket] [TIMEOUT=30m]
+## Does not invoke clean-environment — run `make clean-environment`
+## explicitly when you need to reset the OVH project.
 conformance-test-crud: install setup-credentials
-	@echo "Pre-test cleanup..."
-	@./scripts/ci/clean-environment.sh || true
-	@echo ""
 	@echo "Running CRUD conformance tests..."
 	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=crud FORMAE_TEST_TIMEOUT=$(FORMAE_OPERATION_TIMEOUT) \
-		$(GO) test -tags=conformance -v -timeout $(TEST_TIMEOUT) ./...; \
-	TEST_EXIT=$$?; \
-	echo ""; \
-	echo "Post-test cleanup..."; \
-	./scripts/ci/clean-environment.sh || true; \
-	exit $$TEST_EXIT
+		$(GO) test -tags=conformance -v -timeout $(TEST_TIMEOUT) ./...
 
 ## conformance-test-discovery: Run only discovery tests
 ## Usage: make conformance-test-discovery [TEST=s3-bucket] [TIMEOUT=30m]
+## Does not invoke clean-environment — run `make clean-environment`
+## explicitly when you need to reset the OVH project.
 conformance-test-discovery: install setup-credentials
-	@echo "Pre-test cleanup..."
-	@./scripts/ci/clean-environment.sh || true
-	@echo ""
 	@echo "Running discovery conformance tests..."
 	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=discovery FORMAE_TEST_TIMEOUT=$(FORMAE_OPERATION_TIMEOUT) \
-		$(GO) test -tags=conformance -v -timeout $(TEST_TIMEOUT) ./...; \
-	TEST_EXIT=$$?; \
-	echo ""; \
-	echo "Post-test cleanup..."; \
-	./scripts/ci/clean-environment.sh || true; \
-	exit $$TEST_EXIT
+		$(GO) test -tags=conformance -v -timeout $(TEST_TIMEOUT) ./...
 
 ## conformance-test-crud-run: Run only CRUD lifecycle tests (no cleanup)
 ## Used by CI matrix jobs where cleanup is managed separately.

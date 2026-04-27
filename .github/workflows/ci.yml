@@ -168,7 +168,6 @@ jobs:
           POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
         run: |
           make conformance-test-crud-run TEST=${{ matrix.test-case }}
-          ./scripts/ci/clean-environment.sh
           make conformance-test-discovery-run TEST=${{ matrix.test-case }}
 
   # Clean up test resources after all conformance tests (always runs)

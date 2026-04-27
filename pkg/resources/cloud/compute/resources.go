@@ -21,10 +21,13 @@ const (
 
 var cloudComputeRegistry *base.ResourceRegistry
 
-// instanceStatusChecker verifies the instance has reached ACTIVE status.
-// OVH instances go through BUILD -> ACTIVE (or ERROR) states. ERROR is
-// terminal - return an error so polling stops with an actionable message
-// instead of looping until the framework times out.
+// instanceStatusChecker verifies the instance has reached ACTIVE status AND
+// has at least one ipAddress attached. OVH flips status=ACTIVE before the
+// network interfaces are populated; without the second check, Read can
+// return an instance with no ipAddresses, which our transformer maps to an
+// empty networks array. The verify/sync/update steps then see the
+// dependent createOnly diff and force a replace. ERROR is terminal — return
+// an error so polling stops with an actionable message instead of looping.
 func instanceStatusChecker(resourceData map[string]interface{}) (bool, error) {
 	status, ok := resourceData["status"].(string)
 	if !ok {
@@ -32,6 +35,10 @@ func instanceStatusChecker(resourceData map[string]interface{}) (bool, error) {
 	}
 	switch status {
 	case "ACTIVE":
+		ips, _ := resourceData["ipAddresses"].([]interface{})
+		if len(ips) == 0 {
+			return false, nil
+		}
 		return true, nil
 	case "ERROR":
 		name, _ := resourceData["name"].(string)
