@@ -100,10 +100,13 @@ func privateNetworkReadinessProbe(ctx context.Context, client base.TransportClie
 			return false, nil
 		}
 		regionName, _ := regionObj["region"].(string)
-		if regionName == "" {
+		openstackID, _ := regionObj["openstackId"].(string)
+		if regionName == "" || openstackID == "" {
 			return false, nil
 		}
-		regionalURL := fmt.Sprintf("/cloud/project/%s/region/%s/network/%s", pathCtx.Project, regionName, pathCtx.ResourceName)
+		// The regional endpoint expects the OpenStack UUID, not the OVH
+		// pn-XXX ID — using the latter returns 400 invalid uuid.
+		regionalURL := fmt.Sprintf("/cloud/project/%s/region/%s/network/%s", pathCtx.Project, regionName, openstackID)
 		if _, err := client.Do(ctx, ovhtransport.RequestOptions{Method: "GET", Path: regionalURL}); err != nil {
 			return false, nil
 		}
