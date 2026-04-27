@@ -76,9 +76,45 @@ type PrivateSubnetProvisioner struct {
 	base *base.BaseResource
 }
 
-// Create delegates to BaseResource
+// Create delegates to BaseResource and re-injects network_id into the
+// returned ResourceProperties. The OVH subnet POST response only echoes
+// {id, cidr, gatewayIp, ipPools[]} — it omits the parent networkId which
+// lives in the URL path. Dependents (e.g. instance.networks[].networkId)
+// resolve `subnet.res.network_id` from these properties; without this
+// re-injection, the resolvable returns nothing and the dependent send
+// fails with HTTP 400 InvalidInput.
 func (p *PrivateSubnetProvisioner) Create(ctx context.Context, request *resource.CreateRequest) (*resource.CreateResult, error) {
-	return p.base.Create(ctx, request)
+	result, err := p.base.Create(ctx, request)
+	if err != nil || result == nil || result.ProgressResult == nil {
+		return result, err
+	}
+	if len(result.ProgressResult.ResourceProperties) == 0 {
+		return result, nil
+	}
+
+	var props map[string]interface{}
+	if err := json.Unmarshal(request.Properties, &props); err != nil {
+		return result, nil
+	}
+	networkID, _ := props["network_id"].(string)
+	if networkID == "" {
+		return result, nil
+	}
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(result.ProgressResult.ResourceProperties, &resp); err != nil {
+		return result, nil
+	}
+	if _, ok := resp["network_id"]; ok {
+		return result, nil
+	}
+	resp["network_id"] = networkID
+	merged, err := json.Marshal(resp)
+	if err != nil {
+		return result, nil
+	}
+	result.ProgressResult.ResourceProperties = merged
+	return result, nil
 }
 
 // Read implements Read by listing subnets and filtering by ID.
