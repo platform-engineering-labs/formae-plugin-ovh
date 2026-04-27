@@ -310,6 +310,16 @@ func (b *BaseResource) Update(ctx context.Context, request *resource.UpdateReque
 	}
 
 	responseProps := response.Body
+	// Some OVH endpoints (e.g. PUT instance) return void. Refetch via GET so
+	// the caller sees the updated resource state.
+	if len(responseProps) == 0 {
+		if readResp, readErr := b.Client.Do(ctx, ovhtransport.RequestOptions{
+			Method: "GET",
+			Path:   url,
+		}); readErr == nil {
+			responseProps = readResp.Body
+		}
+	}
 	if b.ResponseTransformer != nil {
 		transformCtx := b.buildTransformContext(ctx, pathCtx, resource.OperationUpdate)
 		responseProps = b.ResponseTransformer.Transform(responseProps, transformCtx)
@@ -412,6 +422,29 @@ func (b *BaseResource) Delete(ctx context.Context, request *resource.DeleteReque
 					break
 				}
 			}
+		}
+	}
+
+	// For resources whose dependents cannot be deleted until the upstream is
+	// fully torn down (e.g. an instance still holding a port on a subnet),
+	// block until the resource returns 404.
+	if b.ResourceConfig.WaitUntilGone {
+		timeout := b.ResourceConfig.DeletionTimeoutSeconds
+		if timeout <= 0 {
+			timeout = 180
+		}
+		deadline := time.Now().Add(time.Duration(timeout) * time.Second)
+		for time.Now().Before(deadline) {
+			_, readErr := b.Client.Do(ctx, ovhtransport.RequestOptions{
+				Method: "GET",
+				Path:   url,
+			})
+			if readErr != nil {
+				if transportErr, ok := readErr.(*ovhtransport.Error); ok && transportErr.Code == ovhtransport.ErrorCodeResourceNotFound {
+					break
+				}
+			}
+			time.Sleep(3 * time.Second)
 		}
 	}
 
