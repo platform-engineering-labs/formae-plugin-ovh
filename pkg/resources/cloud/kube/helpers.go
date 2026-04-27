@@ -83,6 +83,38 @@ func filterProps(props map[string]interface{}, keys ...string) map[string]interf
 	return result
 }
 
+// unwrapFormaeValue resolves a `formae.Value` PKL object to its scalar payload.
+// In a normal `formae apply` the resolution happens upstream so the plugin only
+// ever sees the plain value, but the conformance harness's discovery path
+// (CreateUnmanagedResource) sends the raw evaluated PKL JSON, where a
+// `new formae.Value { value = "1.34"; strategy = "SetOnce" }` arrives as
+// `{"value":"1.34","strategy":"SetOnce"}`. OVH then rejects it because the
+// schema-typed field expects a scalar.
+//
+// If v is a map carrying a "value" key (the formae.Value shape), return that
+// value's payload. Otherwise return v unchanged.
+func unwrapFormaeValue(v interface{}) interface{} {
+	m, ok := v.(map[string]interface{})
+	if !ok {
+		return v
+	}
+	if inner, has := m["value"]; has {
+		// strategy is a formae-only metadata field; don't pass it through.
+		return inner
+	}
+	return v
+}
+
+// normalizeFormaeValues unwraps formae.Value objects on the listed keys in
+// place. Callers should invoke this before forwarding `props` to OVH.
+func normalizeFormaeValues(props map[string]interface{}, keys ...string) {
+	for _, k := range keys {
+		if v, ok := props[k]; ok {
+			props[k] = unwrapFormaeValue(v)
+		}
+	}
+}
+
 // parseNestedNativeID parses "project/kubeId/resourceId" format
 func parseNestedNativeID(nativeID string) (project, kubeID, resourceID string, err error) {
 	parts := strings.SplitN(nativeID, "/", 3)
