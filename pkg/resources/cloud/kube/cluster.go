@@ -42,11 +42,6 @@ func (p *clusterProvisioner) Create(ctx context.Context, request *resource.Creat
 			"serviceName is required"), nil
 	}
 
-	// Resolve `formae.Value` wrappers that the discovery harness leaves intact.
-	// `version` is the only typed field that may arrive as a Value object; in a
-	// normal apply formae has already collapsed it.
-	normalizeFormaeValues(props, "version")
-
 	// Build URL: POST /cloud/project/{project}/kube
 	url := fmt.Sprintf("/cloud/project/%s/kube", project)
 
