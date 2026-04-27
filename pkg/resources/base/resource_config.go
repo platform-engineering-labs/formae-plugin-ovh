@@ -71,4 +71,14 @@ type ResourceConfig struct {
 
 	// DeletionTimeoutSeconds bounds the WaitUntilGone polling. Defaults to 180.
 	DeletionTimeoutSeconds int
+
+	// CreateRetryOnInvalidInputContains retries Create up to
+	// CreateRetryAttempts times when the API returns INVALID_INPUT and the
+	// error message contains any of these substrings. Use this for resources
+	// where dependent state (e.g. an OVH private network just created) takes
+	// extra time to propagate to the resource API and fails synchronously
+	// during the propagation window.
+	CreateRetryOnInvalidInputContains []string
+	CreateRetryAttempts               int
+	CreateRetryBackoffSeconds         int
 }

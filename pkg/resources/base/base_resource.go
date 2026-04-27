@@ -67,11 +67,7 @@ func (b *BaseResource) Create(ctx context.Context, request *resource.CreateReque
 	// Filter nil values - OVH API rejects null for optional fields
 	filteredBody := filterNilValues(body)
 
-	response, err := b.Client.Do(ctx, ovhtransport.RequestOptions{
-		Method: "POST",
-		Path:   url,
-		Body:   filteredBody,
-	})
+	response, err := b.doCreateWithRetry(ctx, url, filteredBody)
 	if err != nil {
 		plugin.LoggerFromContext(ctx).Error("create request failed",
 			"resourceType", b.ResourceConfig.ResourceType, "url", url, "error", err.Error())
@@ -939,6 +935,91 @@ func (b *BaseResource) deleteFailureResult(nativeID string, errorCode resource.O
 			NativeID:        nativeID,
 		},
 	}
+}
+
+// doCreateWithRetry issues the Create POST and, when configured, retries on
+// transient INVALID_INPUT errors whose message indicates a propagation race
+// (e.g. an OVH instance create that races a just-created private network).
+func (b *BaseResource) doCreateWithRetry(ctx context.Context, url string, body interface{}) (*ovhtransport.Response, error) {
+	attempts := b.ResourceConfig.CreateRetryAttempts
+	if attempts <= 0 || len(b.ResourceConfig.CreateRetryOnInvalidInputContains) == 0 {
+		return b.Client.Do(ctx, ovhtransport.RequestOptions{Method: "POST", Path: url, Body: body})
+	}
+
+	backoff := time.Duration(b.ResourceConfig.CreateRetryBackoffSeconds) * time.Second
+	if backoff <= 0 {
+		backoff = 10 * time.Second
+	}
+
+	var lastErr error
+	for attempt := 0; attempt <= attempts; attempt++ {
+		resp, err := b.Client.Do(ctx, ovhtransport.RequestOptions{Method: "POST", Path: url, Body: body})
+		if err == nil {
+			return resp, nil
+		}
+		lastErr = err
+		transportErr, ok := err.(*ovhtransport.Error)
+		if !ok || transportErr.Code != ovhtransport.ErrorCodeInvalidInput {
+			return nil, err
+		}
+		matched := false
+		for _, needle := range b.ResourceConfig.CreateRetryOnInvalidInputContains {
+			if needle != "" && containsCaseInsensitive(transportErr.Message, needle) {
+				matched = true
+				break
+			}
+		}
+		if !matched || attempt == attempts {
+			return nil, err
+		}
+		plugin.LoggerFromContext(ctx).Warn("create retrying on transient INVALID_INPUT",
+			"resourceType", b.ResourceConfig.ResourceType,
+			"url", url,
+			"attempt", attempt+1,
+			"maxAttempts", attempts+1,
+			"backoff", backoff.String(),
+			"message", transportErr.Message)
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(backoff):
+		}
+	}
+	return nil, lastErr
+}
+
+func containsCaseInsensitive(haystack, needle string) bool {
+	return len(needle) > 0 && len(haystack) >= len(needle) && stringsContainsFold(haystack, needle)
+}
+
+// stringsContainsFold is a small wrapper to avoid importing strings only for
+// EqualFold/ToLower, since base_resource is otherwise strings-free.
+func stringsContainsFold(s, substr string) bool {
+	ls, lsub := len(s), len(substr)
+	if lsub == 0 {
+		return true
+	}
+	for i := 0; i+lsub <= ls; i++ {
+		match := true
+		for j := 0; j < lsub; j++ {
+			c1 := s[i+j]
+			c2 := substr[j]
+			if 'A' <= c1 && c1 <= 'Z' {
+				c1 += 'a' - 'A'
+			}
+			if 'A' <= c2 && c2 <= 'Z' {
+				c2 += 'a' - 'A'
+			}
+			if c1 != c2 {
+				match = false
+				break
+			}
+		}
+		if match {
+			return true
+		}
+	}
+	return false
 }
 
 func (b *BaseResource) handleTransportError(err error, operation resource.Operation, nativeID string) *resource.CreateResult {

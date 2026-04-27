@@ -74,6 +74,13 @@ func init() {
 				WaitUntilGone:          true,
 				DeletionTimeoutSeconds: 30,
 				DeletingStatuses:       []string{"DELETING", "DELETED"},
+				// OVH's instance API lags behind the network and subnet APIs:
+				// after a private network/subnet is created, the instance
+				// endpoint can still report "network ... not found" for tens
+				// of seconds. Retry rather than failing the apply.
+				CreateRetryOnInvalidInputContains: []string{"not found"},
+				CreateRetryAttempts:               4,
+				CreateRetryBackoffSeconds:         15,
 			},
 			RequestTransformer:  instanceRequestTransformer_,
 			ResponseTransformer: instanceResponseTransformer_,
