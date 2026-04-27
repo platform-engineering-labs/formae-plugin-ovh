@@ -108,7 +108,7 @@ func (p *PrivateSubnetProvisioner) Create(ctx context.Context, request *resource
 	}
 
 	listURL := fmt.Sprintf("/cloud/project/%s/network/private/%s/subnet", project, networkID)
-	deadline := time.Now().Add(2 * time.Minute)
+	deadline := time.Now().Add(5 * time.Minute)
 	for {
 		subnet, err := p.findCreatedSubnet(ctx, listURL, props)
 		if err != nil {
