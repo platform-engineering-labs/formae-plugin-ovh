@@ -21,7 +21,6 @@ forma {
     serviceName = v.serviceName
     name = "formae-test-\(v.testRunID)-updated" // name is mutable
     region = v.region
-    version = "1.34.6-1"
     updatePolicy = "NEVER_UPDATE"
   }
 }

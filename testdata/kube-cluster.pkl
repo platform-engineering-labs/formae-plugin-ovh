@@ -20,9 +20,8 @@ forma {
     serviceName = v.serviceName
     name = "formae-test-\(v.testRunID)"
     region = v.region
-    // OVH echoes back a full patch version (e.g. "1.33.10-1") on Read; wrap in
-    // formae.Value with SetOnce so Verify doesn't strict-compare it.
-    version = "1.34.6-1"
+    // version intentionally omitted: OVH defaults to its latest stable patch
+    // and the schema's hasProviderDefault hint lets Verify accept whatever it returns.
     updatePolicy = "NEVER_UPDATE"
   }
 }
