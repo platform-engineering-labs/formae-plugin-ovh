@@ -115,11 +115,11 @@ jobs:
   conformance-tests:
     needs: [discover-tests, pre-cleanup]
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     strategy:
       matrix:
         test-case: ${{ fromJson(needs.discover-tests.outputs.test-cases) }}
-      max-parallel: 5
+      max-parallel: 10
       fail-fast: false
 
     steps:
