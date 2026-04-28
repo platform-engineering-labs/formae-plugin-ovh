@@ -100,7 +100,10 @@ clean-environment:
 	@./scripts/ci/clean-environment.sh
 
 # Normalize TIMEOUT: bare digits (legacy minutes form) get "m" appended.
-TEST_TIMEOUT := $(if $(TIMEOUT),$(if $(shell echo $(TIMEOUT) | grep -E '^[0-9]+$$'),$(TIMEOUT)m,$(TIMEOUT)),30m)
+# The default has to be > FORMAE_TIMEOUT + OOB_TIMEOUT + OOB_DELETE_TIMEOUT
+# so a slow kube test doesn't get killed by the outer go-test wrapper before
+# the inner per-phase budgets can play out.
+TEST_TIMEOUT := $(if $(TIMEOUT),$(if $(shell echo $(TIMEOUT) | grep -E '^[0-9]+$$'),$(TIMEOUT)m,$(TIMEOUT)),120m)
 
 # OVH managed Kubernetes is slow:
 #   - cluster create normally takes 2-3 min, but US-EAST-VA-1 has been observed
