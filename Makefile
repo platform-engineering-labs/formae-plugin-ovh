@@ -22,7 +22,7 @@ BINARY := $(PLUGIN_NAME)
 PLUGIN_BASE_DIR := $(HOME)/.pel/formae/plugins
 INSTALL_DIR := $(PLUGIN_BASE_DIR)/$(PLUGIN_NAME)/v$(PLUGIN_VERSION)
 
-.PHONY: all build test test-unit test-integration lint clean install help setup-credentials clean-environment conformance-test conformance-test-crud conformance-test-discovery
+.PHONY: all build test test-unit test-integration lint clean install help setup-credentials clean-environment conformance-test conformance-test-crud conformance-test-discovery conformance-test-crud-run conformance-test-discovery-run conformance-cleanup
 
 all: build
 
@@ -135,35 +135,23 @@ KUBE_TEST_ENV := FORMAE_TEST_TIMEOUT=$(FORMAE_TIMEOUT) \
 ## Calls clean-environment before and after tests.
 conformance-test: conformance-test-crud conformance-test-discovery
 
+## conformance-cleanup: Clean up test resources (pre/post conformance run)
+conformance-cleanup:
+	@./scripts/ci/clean-environment.sh
+
 ## conformance-test-crud: Run only CRUD lifecycle tests
 ## Usage: make conformance-test-crud [TEST=s3-bucket] [TIMEOUT=30m] [OOB_TIMEOUT=30] [OOB_DELETE_TIMEOUT=2]
 conformance-test-crud: install setup-credentials
-	@echo "Pre-test cleanup..."
-	@./scripts/ci/clean-environment.sh || true
-	@echo ""
 	@echo "Running CRUD conformance tests..."
 	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=crud $(KUBE_TEST_ENV) \
-		$(GO) test -tags=conformance -v -timeout $(TEST_TIMEOUT) ./...; \
-	TEST_EXIT=$$?; \
-	echo ""; \
-	echo "Post-test cleanup..."; \
-	./scripts/ci/clean-environment.sh || true; \
-	exit $$TEST_EXIT
+		$(GO) test -tags=conformance -v -timeout $(TEST_TIMEOUT) ./...
 
 ## conformance-test-discovery: Run only discovery tests
 ## Usage: make conformance-test-discovery [TEST=s3-bucket] [TIMEOUT=30m] [OOB_TIMEOUT=30]
 conformance-test-discovery: install setup-credentials
-	@echo "Pre-test cleanup..."
-	@./scripts/ci/clean-environment.sh || true
-	@echo ""
 	@echo "Running discovery conformance tests..."
 	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=discovery $(KUBE_TEST_ENV) \
-		$(GO) test -tags=conformance -v -timeout $(TEST_TIMEOUT) ./...; \
-	TEST_EXIT=$$?; \
-	echo ""; \
-	echo "Post-test cleanup..."; \
-	./scripts/ci/clean-environment.sh || true; \
-	exit $$TEST_EXIT
+		$(GO) test -tags=conformance -v -timeout $(TEST_TIMEOUT) ./...
 
 ## conformance-test-crud-run: Run only CRUD lifecycle tests (no cleanup)
 ## Used by CI matrix jobs where cleanup is managed separately.

@@ -107,7 +107,7 @@ jobs:
         run: pip install python-openstackclient
 
       - name: Clean test resources
-        run: ./scripts/ci/clean-environment.sh
+        run: make conformance-cleanup
 
   # Conformance tests run the full CRUD lifecycle against real OVH resources.
   # Each test case runs in its own isolated job via matrix strategy.
@@ -164,7 +164,6 @@ jobs:
           POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
         run: |
           make conformance-test-crud-run TEST=${{ matrix.test-case }}
-          ./scripts/ci/clean-environment.sh
           make conformance-test-discovery-run TEST=${{ matrix.test-case }}
 
   # Clean up test resources after all conformance tests (always runs)
@@ -196,7 +195,7 @@ jobs:
         run: pip install python-openstackclient
 
       - name: Clean test resources
-        run: ./scripts/ci/clean-environment.sh
+        run: make conformance-cleanup
 
   # Notify when build is fixed (was red, now green)
   notify-fixed:
