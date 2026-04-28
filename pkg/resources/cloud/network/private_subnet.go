@@ -14,6 +14,7 @@ import (
 	"github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/prov"
 	"github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/registry"
 	ovhtransport "github.com/platform-engineering-labs/formae-plugin-ovh/pkg/transport/ovh"
+	"github.com/platform-engineering-labs/formae/pkg/plugin"
 	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
@@ -212,6 +213,8 @@ func (p *PrivateSubnetProvisioner) Delete(ctx context.Context, request *resource
 // it shows up there, so we use Status (rather than blocking inside
 // Create) to do the wait.
 func (p *PrivateSubnetProvisioner) Status(ctx context.Context, request *resource.StatusRequest) (*resource.StatusResult, error) {
+	log := plugin.LoggerFromContext(ctx).With("resourceType", PrivateSubnetResourceType, "nativeID", request.NativeID)
+
 	parts := strings.Split(request.NativeID, "/")
 	if len(parts) != 3 {
 		return &resource.StatusResult{
@@ -232,6 +235,7 @@ func (p *PrivateSubnetProvisioner) Status(ctx context.Context, request *resource
 		Path:   fmt.Sprintf("/cloud/project/%s/network/private/%s", project, networkID),
 	})
 	if err != nil || netResp == nil || netResp.Body == nil {
+		log.Debug("subnet status: network read failed", "error", fmt.Sprint(err))
 		return p.statusInProgress(request, "waiting for parent network read")
 	}
 
@@ -253,6 +257,7 @@ func (p *PrivateSubnetProvisioner) Status(ctx context.Context, request *resource
 		}
 	}
 	if openstackID == "" || region == "" {
+		log.Debug("subnet status: openstackId not yet set on network", "regions", regions)
 		return p.statusInProgress(request, "waiting for network openstackId")
 	}
 
@@ -261,20 +266,36 @@ func (p *PrivateSubnetProvisioner) Status(ctx context.Context, request *resource
 		Path:   fmt.Sprintf("/cloud/project/%s/region/%s/network/%s", project, region, openstackID),
 	})
 	if err != nil || regResp == nil || regResp.Body == nil {
+		log.Debug("subnet status: regional network read failed", "error", fmt.Sprint(err))
 		return p.statusInProgress(request, "waiting for regional network view")
 	}
 	subnetIDs, _ := regResp.Body["subnetIds"].([]interface{})
 	if len(subnetIDs) == 0 {
+		log.Debug("subnet status: regional subnetIds still empty", "openstackId", openstackID, "region", region)
 		return p.statusInProgress(request, "waiting for subnet to appear in regional subnetIds")
 	}
 
-	_ = subnetID
+	// Subnet propagated. Read the subnet's own state to populate
+	// ResourceProperties on the Status result (the framework persists
+	// these as the resource's authoritative state).
+	readResult, _ := p.Read(ctx, &resource.ReadRequest{
+		NativeID:     request.NativeID,
+		ResourceType: request.ResourceType,
+		TargetConfig: request.TargetConfig,
+	})
+	var props json.RawMessage
+	if readResult != nil && readResult.Properties != "" {
+		props = json.RawMessage(readResult.Properties)
+	}
+
+	log.Debug("subnet status: ready", "subnetID", subnetID, "subnetIdsCount", len(subnetIDs))
 	return &resource.StatusResult{
 		ProgressResult: &resource.ProgressResult{
-			Operation:       resource.OperationCheckStatus,
-			OperationStatus: resource.OperationStatusSuccess,
-			RequestID:       request.RequestID,
-			NativeID:        request.NativeID,
+			Operation:          resource.OperationCheckStatus,
+			OperationStatus:    resource.OperationStatusSuccess,
+			RequestID:          request.RequestID,
+			NativeID:           request.NativeID,
+			ResourceProperties: props,
 		},
 	}, nil
 }
