@@ -23,7 +23,7 @@ forma {
     serviceName = v.serviceName
     name = "formae-oidc-\(v.testRunID)"
     region = v.region
-    version = new formae.Value { value = "1.34"; strategy = "SetOnce" }
+    version = "1.34"
     updatePolicy = "NEVER_UPDATE"
   }
   testCluster
