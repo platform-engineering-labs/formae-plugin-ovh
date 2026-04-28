@@ -5,6 +5,8 @@
 package compute
 
 import (
+	"fmt"
+
 	"github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/base"
 	"github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/cloud"
 	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
@@ -20,14 +22,24 @@ const (
 var cloudComputeRegistry *base.ResourceRegistry
 
 // instanceStatusChecker verifies the instance has reached ACTIVE status.
-// OVH instances go through BUILD -> ACTIVE (or ERROR) states.
+// OVH instances go through BUILD -> ACTIVE (or ERROR) states. ERROR is
+// terminal — return an error so polling stops with an actionable message
+// instead of looping until the framework times out.
 func instanceStatusChecker(resourceData map[string]interface{}) (bool, error) {
 	status, ok := resourceData["status"].(string)
 	if !ok {
-		// No status field - consider not ready
 		return false, nil
 	}
-	return status == "ACTIVE", nil
+	switch status {
+	case "ACTIVE":
+		return true, nil
+	case "ERROR":
+		name, _ := resourceData["name"].(string)
+		id, _ := resourceData["id"].(string)
+		return false, fmt.Errorf("instance %q (id=%s) entered ERROR state", name, id)
+	default:
+		return false, nil
+	}
 }
 
 // volumeStatusChecker verifies the volume has reached "available" status.
@@ -57,11 +69,15 @@ func init() {
 			ResourceConfig: base.ResourceConfig{
 				ResourceType:   "instance",
 				Scope:          &base.ScopeConfig{Type: base.ScopeProject},
-				SupportsUpdate: true,
-				UpdateMethod:   base.UpdateMethodPut,
+				SupportsUpdate:         true,
+				UpdateMethod:           base.UpdateMethodPut,
+				WaitUntilGone:          true,
+				DeletionTimeoutSeconds: 30,
+				DeletingStatuses:       []string{"DELETING", "DELETED"},
 			},
-			//ResponseTransformer: instanceTransformer,
-			StatusChecker: instanceStatusChecker,
+			RequestTransformer:  instanceRequestTransformer_,
+			ResponseTransformer: instanceResponseTransformer_,
+			StatusChecker:       instanceStatusChecker,
 			Operations: []resource.Operation{
 				resource.OperationCreate,
 				resource.OperationRead,

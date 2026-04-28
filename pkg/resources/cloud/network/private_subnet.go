@@ -9,12 +9,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/base"
 	"github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/prov"
 	"github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/registry"
 	ovhtransport "github.com/platform-engineering-labs/formae-plugin-ovh/pkg/transport/ovh"
+	"github.com/platform-engineering-labs/formae/pkg/plugin"
 	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
@@ -77,73 +77,52 @@ type PrivateSubnetProvisioner struct {
 	base *base.BaseResource
 }
 
-// Create posts the subnet, then lists subnets to recover the API-generated ID.
+// Create delegates to BaseResource and re-injects networkId into the
+// returned ResourceProperties. The OVH subnet POST response only echoes
+// {id, cidr, gatewayIp, ipPools[]} — it omits the parent networkId which
+// lives in the URL path. Dependents (e.g. instance.networks[].networkId)
+// resolve `subnet.res.networkId` from these properties; without this
+// re-injection, the resolvable returns nothing and the dependent send
+// fails with HTTP 400 InvalidInput.
+//
+// Returns OperationStatusInProgress so the framework polls Status, which
+// blocks until the subnet has propagated into the regional view that the
+// instance API consults (otherwise dependent instance creates can race
+// the propagation and fail with "network <id> not found").
 func (p *PrivateSubnetProvisioner) Create(ctx context.Context, request *resource.CreateRequest) (*resource.CreateResult, error) {
+	result, err := p.base.Create(ctx, request)
+	if err != nil || result == nil || result.ProgressResult == nil {
+		return result, err
+	}
+	if result.ProgressResult.OperationStatus != resource.OperationStatusSuccess {
+		return result, nil
+	}
+
 	var props map[string]interface{}
 	if err := json.Unmarshal(request.Properties, &props); err != nil {
-		return privateSubnetCreateFailure(resource.OperationErrorCodeInvalidRequest, fmt.Sprintf("failed to parse properties: %v", err)), nil
+		return result, nil
+	}
+	networkID, _ := props["networkId"].(string)
+	if networkID == "" {
+		return result, nil
 	}
 
-	project := extractProject(request.TargetConfig)
-	if project == "" {
-		return privateSubnetCreateFailure(resource.OperationErrorCodeInvalidRequest, "project/serviceName is required but not found in target config"), nil
-	}
-
-	networkID, ok := props["network_id"].(string)
-	if !ok || networkID == "" {
-		return privateSubnetCreateFailure(resource.OperationErrorCodeInvalidRequest, "network_id is required"), nil
-	}
-
-	body, err := subnetPrivateTransformer.Transform(props, base.TransformContext{})
-	if err != nil {
-		return privateSubnetCreateFailure(resource.OperationErrorCodeInvalidRequest, fmt.Sprintf("failed to transform request: %v", err)), nil
-	}
-
-	createURL := fmt.Sprintf("/cloud/project/%s/network/private/%s/subnet", project, networkID)
-	if _, err := p.base.Client.Do(ctx, ovhtransport.RequestOptions{Method: "POST", Path: createURL, Body: body}); err != nil {
-		if transportErr, ok := err.(*ovhtransport.Error); ok {
-			return privateSubnetCreateFailure(ovhtransport.ToResourceErrorCode(transportErr.Code), err.Error()), nil
-		}
-		return privateSubnetCreateFailure(resource.OperationErrorCodeServiceInternalError, err.Error()), nil
-	}
-
-	listURL := fmt.Sprintf("/cloud/project/%s/network/private/%s/subnet", project, networkID)
-	deadline := time.Now().Add(2 * time.Minute)
-	for {
-		subnet, err := p.findCreatedSubnet(ctx, listURL, props)
-		if err != nil {
-			return privateSubnetCreateFailure(resource.OperationErrorCodeServiceInternalError, err.Error()), nil
-		}
-		if subnet != nil {
-			id, _ := subnet["id"].(string)
-			if id == "" {
-				return privateSubnetCreateFailure(resource.OperationErrorCodeServiceInternalError, "created subnet response did not include id"), nil
+	if len(result.ProgressResult.ResourceProperties) > 0 {
+		var resp map[string]interface{}
+		if err := json.Unmarshal(result.ProgressResult.ResourceProperties, &resp); err == nil {
+			if _, ok := resp["networkId"]; !ok {
+				resp["networkId"] = networkID
+				if merged, err := json.Marshal(resp); err == nil {
+					result.ProgressResult.ResourceProperties = merged
+				}
 			}
-
-			result := transformSubnetResponse(subnet, networkID)
-			propsJSON, err := json.Marshal(result)
-			if err != nil {
-				return privateSubnetCreateFailure(resource.OperationErrorCodeServiceInternalError, fmt.Sprintf("failed to marshal properties: %v", err)), nil
-			}
-
-			return &resource.CreateResult{ProgressResult: &resource.ProgressResult{
-				Operation:          resource.OperationCreate,
-				OperationStatus:    resource.OperationStatusSuccess,
-				NativeID:           fmt.Sprintf("%s/%s/%s", project, networkID, id),
-				ResourceProperties: propsJSON,
-			}}, nil
-		}
-
-		if time.Now().After(deadline) {
-			return privateSubnetCreateFailure(resource.OperationErrorCodeServiceInternalError, "created subnet was not visible before timeout"), nil
-		}
-
-		select {
-		case <-ctx.Done():
-			return privateSubnetCreateFailure(resource.OperationErrorCodeServiceInternalError, ctx.Err().Error()), nil
-		case <-time.After(5 * time.Second):
 		}
 	}
+
+	// Defer success — Status will flip to OperationStatusSuccess once the
+	// subnet is visible on the regional surface that POST /instance reads.
+	result.ProgressResult.OperationStatus = resource.OperationStatusInProgress
+	return result, nil
 }
 
 // Read implements Read by listing subnets and filtering by ID.
@@ -197,7 +176,7 @@ func (p *PrivateSubnetProvisioner) Read(ctx context.Context, request *resource.R
 		if id, ok := subnet["id"].(string); ok && id == subnetID {
 			// Transform API response to match PKL schema.
 			// API returns: {id, cidr, gatewayIp, ipPools: [{dhcp, end, network, region, start}]}
-			// Schema expects: {id, network_id, region, network, dhcp, noGateway, start, end}
+			// Schema expects: {id, networkId, region, network, dhcp, noGateway, start, end}
 			result := transformSubnetResponse(subnet, networkID)
 
 			propsJSON, err := json.Marshal(result)
@@ -228,9 +207,109 @@ func (p *PrivateSubnetProvisioner) Delete(ctx context.Context, request *resource
 	return p.base.Delete(ctx, request)
 }
 
-// Status delegates to BaseResource
+// Status reports the subnet ready only after the regional view of the
+// parent network reports the subnet in its subnetIds. The instance API
+// reads from that surface and rejects the network with "not found" until
+// it shows up there, so we use Status (rather than blocking inside
+// Create) to do the wait.
 func (p *PrivateSubnetProvisioner) Status(ctx context.Context, request *resource.StatusRequest) (*resource.StatusResult, error) {
-	return p.base.Status(ctx, request)
+	log := plugin.LoggerFromContext(ctx).With("resourceType", PrivateSubnetResourceType, "nativeID", request.NativeID)
+
+	parts := strings.Split(request.NativeID, "/")
+	if len(parts) != 3 {
+		return &resource.StatusResult{
+			ProgressResult: &resource.ProgressResult{
+				Operation:       resource.OperationCheckStatus,
+				OperationStatus: resource.OperationStatusFailure,
+				ErrorCode:       resource.OperationErrorCodeInvalidRequest,
+				StatusMessage:   "invalid native ID for subnet",
+				RequestID:       request.RequestID,
+				NativeID:        request.NativeID,
+			},
+		}, nil
+	}
+	project, networkID, subnetID := parts[0], parts[1], parts[2]
+
+	netResp, err := p.base.Client.Do(ctx, ovhtransport.RequestOptions{
+		Method: "GET",
+		Path:   fmt.Sprintf("/cloud/project/%s/network/private/%s", project, networkID),
+	})
+	if err != nil || netResp == nil || netResp.Body == nil {
+		log.Debug("subnet status: network read failed", "error", fmt.Sprint(err))
+		return p.statusInProgress(request, "waiting for parent network read")
+	}
+
+	region := extractTargetField(request.TargetConfig, []string{"Region", "region", "OS_REGION_NAME"})
+	regions, _ := netResp.Body["regions"].([]interface{})
+	openstackID := ""
+	for _, r := range regions {
+		ro, ok := r.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		regionName, _ := ro["region"].(string)
+		if region == "" || regionName == region {
+			openstackID, _ = ro["openstackId"].(string)
+			if openstackID != "" {
+				region = regionName
+				break
+			}
+		}
+	}
+	if openstackID == "" || region == "" {
+		log.Debug("subnet status: openstackId not yet set on network", "regions", regions)
+		return p.statusInProgress(request, "waiting for network openstackId")
+	}
+
+	regResp, err := p.base.Client.Do(ctx, ovhtransport.RequestOptions{
+		Method: "GET",
+		Path:   fmt.Sprintf("/cloud/project/%s/region/%s/network/%s", project, region, openstackID),
+	})
+	if err != nil || regResp == nil || regResp.Body == nil {
+		log.Debug("subnet status: regional network read failed", "error", fmt.Sprint(err))
+		return p.statusInProgress(request, "waiting for regional network view")
+	}
+	subnetIDs, _ := regResp.Body["subnetIds"].([]interface{})
+	if len(subnetIDs) == 0 {
+		log.Debug("subnet status: regional subnetIds still empty", "openstackId", openstackID, "region", region)
+		return p.statusInProgress(request, "waiting for subnet to appear in regional subnetIds")
+	}
+
+	// Subnet propagated. Read the subnet's own state to populate
+	// ResourceProperties on the Status result (the framework persists
+	// these as the resource's authoritative state).
+	readResult, _ := p.Read(ctx, &resource.ReadRequest{
+		NativeID:     request.NativeID,
+		ResourceType: request.ResourceType,
+		TargetConfig: request.TargetConfig,
+	})
+	var props json.RawMessage
+	if readResult != nil && readResult.Properties != "" {
+		props = json.RawMessage(readResult.Properties)
+	}
+
+	log.Debug("subnet status: ready", "subnetID", subnetID, "subnetIdsCount", len(subnetIDs))
+	return &resource.StatusResult{
+		ProgressResult: &resource.ProgressResult{
+			Operation:          resource.OperationCheckStatus,
+			OperationStatus:    resource.OperationStatusSuccess,
+			RequestID:          request.RequestID,
+			NativeID:           request.NativeID,
+			ResourceProperties: props,
+		},
+	}, nil
+}
+
+func (p *PrivateSubnetProvisioner) statusInProgress(request *resource.StatusRequest, msg string) (*resource.StatusResult, error) {
+	return &resource.StatusResult{
+		ProgressResult: &resource.ProgressResult{
+			Operation:       resource.OperationCheckStatus,
+			OperationStatus: resource.OperationStatusInProgress,
+			StatusMessage:   msg,
+			RequestID:       request.RequestID,
+			NativeID:        request.NativeID,
+		},
+	}, nil
 }
 
 // List enumerates all private subnets across all private networks.
@@ -304,7 +383,7 @@ func init() {
 			ParentResource: &base.ParentResourceConfig{
 				RequiresParent: true,
 				ParentType:     "network/private", // Used in URL path
-				PropertyName:   "network_id",
+				PropertyName:   "networkId",
 			},
 			SupportsUpdate: false, // OVH subnets are not updatable
 		},
@@ -315,6 +394,7 @@ func init() {
 			resource.OperationRead,
 			resource.OperationDelete,
 			resource.OperationList,
+			resource.OperationCheckStatus,
 		},
 	}
 
@@ -339,80 +419,13 @@ func init() {
 	)
 }
 
-func (p *PrivateSubnetProvisioner) findCreatedSubnet(ctx context.Context, listURL string, expected map[string]interface{}) (map[string]interface{}, error) {
-	response, err := p.base.Client.Do(ctx, ovhtransport.RequestOptions{Method: "GET", Path: listURL})
-	if err != nil {
-		return nil, err
-	}
-
-	for _, s := range response.BodyArray {
-		subnet, ok := s.(map[string]interface{})
-		if !ok || !subnetMatchesRequest(subnet, expected) {
-			continue
-		}
-		return subnet, nil
-	}
-
-	return nil, nil
-}
-
-func subnetMatchesRequest(subnet map[string]interface{}, expected map[string]interface{}) bool {
-	ipPools, ok := subnet["ipPools"].([]interface{})
-	if ok {
-		for _, item := range ipPools {
-			pool, ok := item.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			if poolMatchesRequest(pool, expected) {
-				return true
-			}
-		}
-	}
-
-	if expectedNetwork, _ := expected["network"].(string); expectedNetwork != "" {
-		if cidr, _ := subnet["cidr"].(string); cidr == expectedNetwork {
-			return true
-		}
-	}
-
-	return false
-}
-
-func poolMatchesRequest(pool map[string]interface{}, expected map[string]interface{}) bool {
-	for _, field := range []string{"network", "region", "start", "end"} {
-		if expectedValue, _ := expected[field].(string); expectedValue != "" {
-			if actualValue, _ := pool[field].(string); actualValue != expectedValue {
-				return false
-			}
-		}
-	}
-
-	if expectedDHCP, ok := expected["dhcp"].(bool); ok {
-		if actualDHCP, ok := pool["dhcp"].(bool); !ok || actualDHCP != expectedDHCP {
-			return false
-		}
-	}
-
-	return true
-}
-
-func privateSubnetCreateFailure(code resource.OperationErrorCode, message string) *resource.CreateResult {
-	return &resource.CreateResult{ProgressResult: &resource.ProgressResult{
-		Operation:       resource.OperationCreate,
-		OperationStatus: resource.OperationStatusFailure,
-		ErrorCode:       code,
-		StatusMessage:   message,
-	}}
-}
-
 // transformSubnetResponse maps the OVH API GET response to PKL schema field names.
 // API returns: {id, cidr, gatewayIp, ipPools: [{dhcp, end, network, region, start}]}
-// Schema expects: {id, network_id, region, network, dhcp, noGateway, start, end}
+// Schema expects: {id, networkId, region, network, dhcp, noGateway, start, end}
 func transformSubnetResponse(subnet map[string]interface{}, networkID string) map[string]interface{} {
 	result := map[string]interface{}{
-		"id":         subnet["id"],
-		"network_id": networkID,
+		"id":        subnet["id"],
+		"networkId": networkID,
 	}
 
 	// Derive noGateway from gatewayIp (empty means no gateway)

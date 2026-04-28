@@ -62,4 +62,13 @@ type ResourceConfig struct {
 	// deleted. When Read encounters one of these in the "status" response field,
 	// it returns NotFound so formae's sync correctly tombstones the resource.
 	DeletingStatuses []string
+
+	// WaitUntilGone makes Delete poll the resource URL until it returns 404 (or
+	// the timeout expires) before returning Success. Use this for resources
+	// where dependents (e.g. subnet → instance port) need the upstream resource
+	// fully torn down before they can be deleted.
+	WaitUntilGone bool
+
+	// DeletionTimeoutSeconds bounds the WaitUntilGone polling. Defaults to 180.
+	DeletionTimeoutSeconds int
 }

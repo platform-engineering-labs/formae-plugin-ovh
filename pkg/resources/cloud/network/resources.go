@@ -39,12 +39,31 @@ func gatewayStatusChecker(resourceData map[string]interface{}) (bool, error) {
 	return status == "ACTIVE", nil
 }
 
-// privateNetworkStatusChecker verifies all regions have ACTIVE status.
-// OVH private networks require region activation before subnets can be created.
+// privateNetworkStatusChecker verifies the network is fully provisioned.
+// cloud.network.Network has TWO status fields:
+//   - top-level `status` (NetworkStatusEnum: ACTIVE | BUILDING | DELETING |
+//     ERROR) — overall network state.
+//   - `regions[].status` (NetworkRegionStatusEnum) — per-region rollout.
+// Dependents (subnet, instance) can race the network if we only gate on
+// regions[].status reaching ACTIVE — the instance API consults the
+// top-level status and rejects with "network not found" until it flips to
+// ACTIVE. Each region also needs an openstackId before its compute layer
+// can resolve the network. ERROR is terminal.
 func privateNetworkStatusChecker(resourceData map[string]interface{}) (bool, error) {
+	if topStatus, ok := resourceData["status"].(string); ok {
+		switch topStatus {
+		case "ACTIVE":
+			// continue to per-region checks
+		case "ERROR":
+			id, _ := resourceData["id"].(string)
+			return false, fmt.Errorf("private network %s entered ERROR state", id)
+		default:
+			return false, nil
+		}
+	}
+
 	regions, ok := resourceData["regions"].([]interface{})
 	if !ok {
-		// No regions field or not an array - consider ready
 		return true, nil
 	}
 
@@ -55,25 +74,57 @@ func privateNetworkStatusChecker(resourceData map[string]interface{}) (bool, err
 		}
 		status, _ := region["status"].(string)
 		if status != "ACTIVE" {
-			// At least one region is not yet active
+			return false, nil
+		}
+		openstackID, _ := region["openstackId"].(string)
+		if openstackID == "" {
 			return false, nil
 		}
 	}
 
-	// All regions are active
 	return true, nil
 }
 
-// privateNetworkReadinessProbe verifies the network is visible on the subnet
-// API endpoint. OVH has eventual consistency between the network and subnet
-// endpoints — a network can be ACTIVE on its own endpoint but not yet visible
-// when creating subnets. This probe hits the subnet list endpoint to confirm.
+// privateNetworkReadinessProbe verifies the network is visible on the
+// surfaces that dependent resources actually call:
+//   - /network/private/{id}/subnet  — subnets are created here.
+//   - /region/{r}/network/{id}      — the regional/Neutron view that the
+//     instance API consults; staying on /network/private alone leads to
+//     "network <id> not found" responses from POST /instance even after
+//     the network reports status=ACTIVE with an openstackId.
+// We re-fetch the network to learn its regions, then probe each one.
 func privateNetworkReadinessProbe(ctx context.Context, client base.TransportClient, pathCtx base.PathContext) (bool, error) {
-	url := fmt.Sprintf("/cloud/project/%s/network/private/%s/subnet", pathCtx.Project, pathCtx.ResourceName)
-	_, err := client.Do(ctx, ovhtransport.RequestOptions{Method: "GET", Path: url})
-	if err != nil {
-		// Network not yet visible on subnet endpoint
+	subnetURL := fmt.Sprintf("/cloud/project/%s/network/private/%s/subnet", pathCtx.Project, pathCtx.ResourceName)
+	if _, err := client.Do(ctx, ovhtransport.RequestOptions{Method: "GET", Path: subnetURL}); err != nil {
 		return false, nil
+	}
+
+	netURL := fmt.Sprintf("/cloud/project/%s/network/private/%s", pathCtx.Project, pathCtx.ResourceName)
+	netResp, err := client.Do(ctx, ovhtransport.RequestOptions{Method: "GET", Path: netURL})
+	if err != nil {
+		return false, nil
+	}
+
+	regionsRaw, _ := netResp.Body["regions"].([]interface{})
+	if len(regionsRaw) == 0 {
+		return false, nil
+	}
+	for _, r := range regionsRaw {
+		regionObj, ok := r.(map[string]interface{})
+		if !ok {
+			return false, nil
+		}
+		regionName, _ := regionObj["region"].(string)
+		openstackID, _ := regionObj["openstackId"].(string)
+		if regionName == "" || openstackID == "" {
+			return false, nil
+		}
+		// The regional endpoint expects the OpenStack UUID, not the OVH
+		// pn-XXX ID — using the latter returns 400 invalid uuid.
+		regionalURL := fmt.Sprintf("/cloud/project/%s/region/%s/network/%s", pathCtx.Project, regionName, openstackID)
+		if _, err := client.Do(ctx, ovhtransport.RequestOptions{Method: "GET", Path: regionalURL}); err != nil {
+			return false, nil
+		}
 	}
 	return true, nil
 }

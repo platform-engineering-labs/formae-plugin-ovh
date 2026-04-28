@@ -118,13 +118,13 @@ func TestSubnetPrivateRequestTransformer(t *testing.T) {
 	transformer := &subnetPrivateRequestTransformer{}
 
 	input := map[string]interface{}{
-		"region":     "DE1",
-		"network_id": "some-network-id", // Should be stripped (used in URL path)
-		"network":    "10.0.3.0/24",
-		"dhcp":       true,
-		"noGateway":  false,
-		"start":      "10.0.3.2",
-		"end":        "10.0.3.254",
+		"region":    "DE1",
+		"networkId": "some-network-id", // Should be stripped (used in URL path)
+		"network":   "10.0.3.0/24",
+		"dhcp":      true,
+		"noGateway": false,
+		"start":     "10.0.3.2",
+		"end":       "10.0.3.254",
 	}
 
 	result, err := transformer.Transform(input, base.TransformContext{})
@@ -138,8 +138,8 @@ func TestSubnetPrivateRequestTransformer(t *testing.T) {
 	assert.Equal(t, "10.0.3.2", result["start"])
 	assert.Equal(t, "10.0.3.254", result["end"])
 
-	// Check that network_id is NOT included (used in URL path)
-	assert.NotContains(t, result, "network_id")
+	// networkId is the URL path component, not part of the body.
+	assert.NotContains(t, result, "networkId")
 }
 
 func TestFloatingIPPathBuilder(t *testing.T) {

@@ -32,7 +32,7 @@ forma {
   new privatesubnet.PrivateSubnet {
     label = "plugin-sdk-test-subnet"
     region = v.region
-    network_id = testNetwork.res.id
+    networkId = testNetwork.res.id
     network = "10.0.6.0/24"
     dhcp = true
     noGateway = false

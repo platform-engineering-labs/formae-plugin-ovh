@@ -7,6 +7,7 @@ import (
 	"time"
 
 	ovhtransport "github.com/platform-engineering-labs/formae-plugin-ovh/pkg/transport/ovh"
+	"github.com/platform-engineering-labs/formae/pkg/plugin"
 	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
@@ -72,6 +73,8 @@ func (b *BaseResource) Create(ctx context.Context, request *resource.CreateReque
 		Body:   filteredBody,
 	})
 	if err != nil {
+		plugin.LoggerFromContext(ctx).Error("create request failed",
+			"resourceType", b.ResourceConfig.ResourceType, "url", url, "error", err.Error())
 		return b.handleTransportError(err, resource.OperationCreate, ""), nil
 	}
 
@@ -310,6 +313,16 @@ func (b *BaseResource) Update(ctx context.Context, request *resource.UpdateReque
 	}
 
 	responseProps := response.Body
+	// Some OVH endpoints (e.g. PUT instance) return void. Refetch via GET so
+	// the caller sees the updated resource state.
+	if len(responseProps) == 0 {
+		if readResp, readErr := b.Client.Do(ctx, ovhtransport.RequestOptions{
+			Method: "GET",
+			Path:   url,
+		}); readErr == nil {
+			responseProps = readResp.Body
+		}
+	}
 	if b.ResponseTransformer != nil {
 		transformCtx := b.buildTransformContext(ctx, pathCtx, resource.OperationUpdate)
 		responseProps = b.ResponseTransformer.Transform(responseProps, transformCtx)
@@ -412,6 +425,29 @@ func (b *BaseResource) Delete(ctx context.Context, request *resource.DeleteReque
 					break
 				}
 			}
+		}
+	}
+
+	// For resources whose dependents cannot be deleted until the upstream is
+	// fully torn down (e.g. an instance still holding a port on a subnet),
+	// block until the resource returns 404.
+	if b.ResourceConfig.WaitUntilGone {
+		timeout := b.ResourceConfig.DeletionTimeoutSeconds
+		if timeout <= 0 {
+			timeout = 180
+		}
+		deadline := time.Now().Add(time.Duration(timeout) * time.Second)
+		for time.Now().Before(deadline) {
+			_, readErr := b.Client.Do(ctx, ovhtransport.RequestOptions{
+				Method: "GET",
+				Path:   url,
+			})
+			if readErr != nil {
+				if transportErr, ok := readErr.(*ovhtransport.Error); ok && transportErr.Code == ovhtransport.ErrorCodeResourceNotFound {
+					break
+				}
+			}
+			time.Sleep(3 * time.Second)
 		}
 	}
 
@@ -583,11 +619,15 @@ func (b *BaseResource) Status(ctx context.Context, request *resource.StatusReque
 	}
 
 	if !ready {
+		statusMsg := "Resource is not yet ready"
+		if s, ok := response.Body["status"].(string); ok && s != "" {
+			statusMsg = fmt.Sprintf("Resource is not yet ready (current status: %s)", s)
+		}
 		return &resource.StatusResult{
 			ProgressResult: &resource.ProgressResult{
 				Operation:       resource.OperationCheckStatus,
 				OperationStatus: resource.OperationStatusInProgress,
-				StatusMessage:   "Resource is not yet ready",
+				StatusMessage:   statusMsg,
 				RequestID:       request.RequestID,
 				NativeID:        request.NativeID,
 			},
@@ -908,7 +948,7 @@ func (b *BaseResource) handleTransportError(err error, operation resource.Operat
 				Operation:       operation,
 				OperationStatus: resource.OperationStatusFailure,
 				ErrorCode:       ovhtransport.ToResourceErrorCode(transportErr.Code),
-				StatusMessage:   transportErr.Message,
+				StatusMessage:   formatTransportError(b.ResourceConfig.ResourceType, transportErr),
 				NativeID:        nativeID,
 			},
 		}
@@ -918,7 +958,17 @@ func (b *BaseResource) handleTransportError(err error, operation resource.Operat
 
 func (b *BaseResource) handleTransportErrorUpdate(err error, nativeID string) *resource.UpdateResult {
 	if transportErr, ok := err.(*ovhtransport.Error); ok {
-		return b.updateFailureResult(nativeID, ovhtransport.ToResourceErrorCode(transportErr.Code), transportErr.Message)
+		return b.updateFailureResult(nativeID, ovhtransport.ToResourceErrorCode(transportErr.Code), formatTransportError(b.ResourceConfig.ResourceType, transportErr))
 	}
 	return b.updateFailureResult(nativeID, resource.OperationErrorCodeServiceInternalError, err.Error())
+}
+
+// formatTransportError builds a single-line message that surfaces enough
+// context (resource type, HTTP code, OVH error message) for conformance and
+// CI logs to be diagnosable without consulting plugin debug output.
+func formatTransportError(resourceType string, err *ovhtransport.Error) string {
+	if err.HTTPCode > 0 {
+		return fmt.Sprintf("OVH %s: HTTP %d %s: %s", resourceType, err.HTTPCode, err.Code, err.Message)
+	}
+	return fmt.Sprintf("OVH %s: %s: %s", resourceType, err.Code, err.Message)
 }
