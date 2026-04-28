@@ -4,26 +4,26 @@
  * SPDX-License-Identifier: FSL-1.1-ALv2
  */
 
-/// OVH PostgreSQL Connection Pool
-module ovh.database.postgresql_connection_pool
+/// OVH KafkaConnect User
+module ovh.database.kafka_connect_user
 
 import "@formae/formae.pkl"
 import "../ovh.pkl"
 
-const type = "OVH::Database::PostgreSQLConnectionPool"
+const type = "OVH::Database::KafkaConnectUser"
 
-typealias ConnectionMode = "session"|"statement"|"transaction"
-
-open class PostgreSQLConnectionPoolResolvable extends formae.Resolvable {
+open class KafkaConnectUserResolvable extends formae.Resolvable {
   hidden type = module.type
-  hidden id: PostgreSQLConnectionPoolResolvable = (this) { property = "id" }
+  hidden id: KafkaConnectUserResolvable = (this) { property = "id" }
+  hidden username: KafkaConnectUserResolvable = (this) { property = "username" }
+  hidden password: KafkaConnectUserResolvable = (this) { property = "password" }
 }
 
 @ovh.ResourceHint {
   type = module.type
   identifier = "id"
 }
-open class PostgreSQLConnectionPool extends formae.Resource {
+open class KafkaConnectUser extends formae.Resource {
   hidden parent = this
 
   @ovh.FieldHint { required = true; createOnly = true }
@@ -35,27 +35,18 @@ open class PostgreSQLConnectionPool extends formae.Resource {
   @ovh.FieldHint { required = true; createOnly = true }
   name: String
 
-  @ovh.FieldHint { required = true }
-  mode: ConnectionMode
-
-  @ovh.FieldHint { required = true }
-  size: Int
-
-  @ovh.FieldHint { required = true }
-  databaseId: (String|formae.Resolvable)
-
-  userId: (String|formae.Resolvable)?
-
   @ovh.FieldHint { hasProviderDefault = true }
   id: String?
   @ovh.FieldHint { hasProviderDefault = true }
-  port: Int?
+  username: String?
   @ovh.FieldHint { hasProviderDefault = true }
-  sslMode: String?
+  password: String?
   @ovh.FieldHint { hasProviderDefault = true }
-  uri: String?
+  createdAt: String?
+  @ovh.FieldHint { hasProviderDefault = true }
+  status: String?
 
-  hidden res: PostgreSQLConnectionPoolResolvable = new {
+  hidden res: KafkaConnectUserResolvable = new {
     label = parent.label
     stack = parent.stack?.label
   }

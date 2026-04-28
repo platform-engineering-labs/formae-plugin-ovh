@@ -8,46 +8,42 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
-	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 	"github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/prov"
 	ovhtransport "github.com/platform-engineering-labs/formae-plugin-ovh/pkg/transport/ovh"
+	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
-// NestedResourceConfig configures a nested database resource.
-type NestedResourceConfig struct {
-	// PathSegment is the resource type in the URL (e.g., "database", "user", "topic")
-	PathSegment string
-	// IDField is the field name for the resource ID in responses (default "id")
-	IDField string
-	// FixedEngine restricts this resource to a specific engine (e.g., "kafka", "postgresql")
-	FixedEngine string
-	// SupportsUpdate indicates if PUT is supported
+// EngineNestedConfig configures a nested resource within an engine-specific cluster.
+type EngineNestedConfig struct {
+	Engine         string   // e.g. "mysql", "postgresql"
+	PathSegment    string   // e.g. "user", "database", "ipRestriction", "integration"
+	IDField        string   // default "id"
 	SupportsUpdate bool
-	// StripFields are fields to remove from request body (in URL path)
-	StripFields []string
+	StripFields    []string // default {"serviceName", "clusterId"}
 }
 
-// nestedProvisioner handles nested database resource operations.
-// Path: /cloud/project/{project}/database/{engine}/{clusterId}/{resourceType}[/{resourceId}]
-type nestedProvisioner struct {
+// engineNestedProvisioner manages nested resources under a specific engine cluster.
+// Native ID format: "project/clusterId/resourceId".
+type engineNestedProvisioner struct {
 	client *ovhtransport.Client
-	config NestedResourceConfig
+	config EngineNestedConfig
 }
 
-var _ prov.Provisioner = &nestedProvisioner{}
+var _ prov.Provisioner = &engineNestedProvisioner{}
 
-func newNestedProvisioner(client *ovhtransport.Client, config NestedResourceConfig) *nestedProvisioner {
+func newEngineNestedProvisioner(client *ovhtransport.Client, config EngineNestedConfig) *engineNestedProvisioner {
 	if config.IDField == "" {
 		config.IDField = "id"
 	}
 	if config.StripFields == nil {
-		config.StripFields = []string{"serviceName", "engine", "clusterId"}
+		config.StripFields = []string{"serviceName", "clusterId"}
 	}
-	return &nestedProvisioner{client: client, config: config}
+	return &engineNestedProvisioner{client: client, config: config}
 }
 
-func (p *nestedProvisioner) Create(ctx context.Context, request *resource.CreateRequest) (*resource.CreateResult, error) {
+func (p *engineNestedProvisioner) Create(ctx context.Context, request *resource.CreateRequest) (*resource.CreateResult, error) {
 	var props map[string]interface{}
 	if err := json.Unmarshal(request.Properties, &props); err != nil {
 		return createFailure(resource.OperationErrorCodeInvalidRequest,
@@ -55,17 +51,15 @@ func (p *nestedProvisioner) Create(ctx context.Context, request *resource.Create
 	}
 
 	project := extractProject(request.TargetConfig, props)
-	engine := p.getEngine(props)
 	clusterID := resolveString(props["clusterId"])
 
-	if project == "" || engine == "" || clusterID == "" {
+	if project == "" || clusterID == "" {
 		return createFailure(resource.OperationErrorCodeInvalidRequest,
-			"serviceName, engine, and clusterId are required"), nil
+			"serviceName and clusterId are required"), nil
 	}
 
-	// Build URL: POST /cloud/project/{project}/database/{engine}/{clusterId}/{resourceType}
 	url := fmt.Sprintf("/cloud/project/%s/database/%s/%s/%s",
-		project, engine, clusterID, p.config.PathSegment)
+		project, p.config.Engine, clusterID, p.config.PathSegment)
 
 	body := filterProps(props, p.config.StripFields...)
 
@@ -78,16 +72,13 @@ func (p *nestedProvisioner) Create(ctx context.Context, request *resource.Create
 		return handleTransportError(err), nil
 	}
 
-	// Extract resource ID
 	resourceID := resolveString(response.Body[p.config.IDField])
 	if resourceID == "" {
 		return createFailure(resource.OperationErrorCodeServiceInternalError,
 			fmt.Sprintf("no %s in response", p.config.IDField)), nil
 	}
 
-	// Native ID: project/engine/clusterId/resourceId
-	nativeID := fmt.Sprintf("%s/%s/%s/%s", project, engine, clusterID, resourceID)
-
+	nativeID := fmt.Sprintf("%s/%s/%s", project, clusterID, resourceID)
 	propsJSON, _ := json.Marshal(response.Body)
 
 	return &resource.CreateResult{
@@ -100,19 +91,16 @@ func (p *nestedProvisioner) Create(ctx context.Context, request *resource.Create
 	}, nil
 }
 
-func (p *nestedProvisioner) Read(ctx context.Context, request *resource.ReadRequest) (*resource.ReadResult, error) {
-	project, engine, clusterID, resourceID, err := parseNestedNativeID(request.NativeID)
+func (p *engineNestedProvisioner) Read(ctx context.Context, request *resource.ReadRequest) (*resource.ReadResult, error) {
+	project, clusterID, resourceID, err := parseEngineNestedNativeID(request.NativeID)
 	if err != nil {
 		return &resource.ReadResult{ErrorCode: resource.OperationErrorCodeInvalidRequest}, nil
 	}
 
 	url := fmt.Sprintf("/cloud/project/%s/database/%s/%s/%s/%s",
-		project, engine, clusterID, p.config.PathSegment, resourceID)
+		project, p.config.Engine, clusterID, p.config.PathSegment, resourceID)
 
-	response, err := p.client.Do(ctx, ovhtransport.RequestOptions{
-		Method: "GET",
-		Path:   url,
-	})
+	response, err := p.client.Do(ctx, ovhtransport.RequestOptions{Method: "GET", Path: url})
 	if err != nil {
 		if transportErr, ok := err.(*ovhtransport.Error); ok {
 			return &resource.ReadResult{
@@ -126,7 +114,7 @@ func (p *nestedProvisioner) Read(ctx context.Context, request *resource.ReadRequ
 	return &resource.ReadResult{Properties: string(propsJSON)}, nil
 }
 
-func (p *nestedProvisioner) Update(ctx context.Context, request *resource.UpdateRequest) (*resource.UpdateResult, error) {
+func (p *engineNestedProvisioner) Update(ctx context.Context, request *resource.UpdateRequest) (*resource.UpdateResult, error) {
 	if !p.config.SupportsUpdate {
 		return &resource.UpdateResult{
 			ProgressResult: &resource.ProgressResult{
@@ -144,13 +132,13 @@ func (p *nestedProvisioner) Update(ctx context.Context, request *resource.Update
 			fmt.Sprintf("failed to parse properties: %v", err)), nil
 	}
 
-	project, engine, clusterID, resourceID, err := parseNestedNativeID(request.NativeID)
+	project, clusterID, resourceID, err := parseEngineNestedNativeID(request.NativeID)
 	if err != nil {
 		return updateFailure(request.NativeID, resource.OperationErrorCodeInvalidRequest, err.Error()), nil
 	}
 
 	url := fmt.Sprintf("/cloud/project/%s/database/%s/%s/%s/%s",
-		project, engine, clusterID, p.config.PathSegment, resourceID)
+		project, p.config.Engine, clusterID, p.config.PathSegment, resourceID)
 
 	body := filterProps(props, p.config.StripFields...)
 
@@ -168,7 +156,6 @@ func (p *nestedProvisioner) Update(ctx context.Context, request *resource.Update
 	}
 
 	propsJSON, _ := json.Marshal(response.Body)
-
 	return &resource.UpdateResult{
 		ProgressResult: &resource.ProgressResult{
 			Operation:          resource.OperationUpdate,
@@ -179,19 +166,16 @@ func (p *nestedProvisioner) Update(ctx context.Context, request *resource.Update
 	}, nil
 }
 
-func (p *nestedProvisioner) Delete(ctx context.Context, request *resource.DeleteRequest) (*resource.DeleteResult, error) {
-	project, engine, clusterID, resourceID, err := parseNestedNativeID(request.NativeID)
+func (p *engineNestedProvisioner) Delete(ctx context.Context, request *resource.DeleteRequest) (*resource.DeleteResult, error) {
+	project, clusterID, resourceID, err := parseEngineNestedNativeID(request.NativeID)
 	if err != nil {
 		return deleteFailure(request.NativeID, resource.OperationErrorCodeInvalidRequest, err.Error()), nil
 	}
 
 	url := fmt.Sprintf("/cloud/project/%s/database/%s/%s/%s/%s",
-		project, engine, clusterID, p.config.PathSegment, resourceID)
+		project, p.config.Engine, clusterID, p.config.PathSegment, resourceID)
 
-	_, err = p.client.Do(ctx, ovhtransport.RequestOptions{
-		Method: "DELETE",
-		Path:   url,
-	})
+	_, err = p.client.Do(ctx, ovhtransport.RequestOptions{Method: "DELETE", Path: url})
 	if err != nil {
 		if transportErr, ok := err.(*ovhtransport.Error); ok {
 			if transportErr.Code == ovhtransport.ErrorCodeResourceNotFound {
@@ -218,22 +202,18 @@ func (p *nestedProvisioner) Delete(ctx context.Context, request *resource.Delete
 	}, nil
 }
 
-func (p *nestedProvisioner) List(ctx context.Context, request *resource.ListRequest) (*resource.ListResult, error) {
+func (p *engineNestedProvisioner) List(ctx context.Context, request *resource.ListRequest) (*resource.ListResult, error) {
 	project := extractProjectFromAdditional(request.TargetConfig, request.AdditionalProperties)
-	engine := p.getEngineFromAdditional(request.AdditionalProperties)
 	clusterID := request.AdditionalProperties["clusterId"]
 
-	if project == "" || engine == "" || clusterID == "" {
+	if project == "" || clusterID == "" {
 		return &resource.ListResult{NativeIDs: nil}, nil
 	}
 
 	url := fmt.Sprintf("/cloud/project/%s/database/%s/%s/%s",
-		project, engine, clusterID, p.config.PathSegment)
+		project, p.config.Engine, clusterID, p.config.PathSegment)
 
-	response, err := p.client.Do(ctx, ovhtransport.RequestOptions{
-		Method: "GET",
-		Path:   url,
-	})
+	response, err := p.client.Do(ctx, ovhtransport.RequestOptions{Method: "GET", Path: url})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list resources: %w", err)
 	}
@@ -241,15 +221,13 @@ func (p *nestedProvisioner) List(ctx context.Context, request *resource.ListRequ
 	var nativeIDs []string
 	for _, item := range response.BodyArray {
 		if id, ok := item.(string); ok {
-			nativeIDs = append(nativeIDs, fmt.Sprintf("%s/%s/%s/%s", project, engine, clusterID, id))
+			nativeIDs = append(nativeIDs, fmt.Sprintf("%s/%s/%s", project, clusterID, id))
 		}
 	}
-
 	return &resource.ListResult{NativeIDs: nativeIDs}, nil
 }
 
-func (p *nestedProvisioner) Status(ctx context.Context, request *resource.StatusRequest) (*resource.StatusResult, error) {
-	// Nested resources don't need status polling by default
+func (p *engineNestedProvisioner) Status(ctx context.Context, request *resource.StatusRequest) (*resource.StatusResult, error) {
 	return &resource.StatusResult{
 		ProgressResult: &resource.ProgressResult{
 			Operation:       resource.OperationCheckStatus,
@@ -260,26 +238,11 @@ func (p *nestedProvisioner) Status(ctx context.Context, request *resource.Status
 	}, nil
 }
 
-// getEngine returns the engine from props or the fixed engine
-func (p *nestedProvisioner) getEngine(props map[string]interface{}) string {
-	if p.config.FixedEngine != "" {
-		return p.config.FixedEngine
+// parseEngineNestedNativeID parses "project/clusterId/resourceId" format.
+func parseEngineNestedNativeID(nativeID string) (project, clusterID, resourceID string, err error) {
+	parts := strings.SplitN(nativeID, "/", 3)
+	if len(parts) != 3 {
+		return "", "", "", fmt.Errorf("invalid nested native ID: %s", nativeID)
 	}
-	return resolveString(props["engine"])
-}
-
-// getEngineFromAdditional returns the engine from additional props or the fixed engine
-func (p *nestedProvisioner) getEngineFromAdditional(additionalProps map[string]string) string {
-	if p.config.FixedEngine != "" {
-		return p.config.FixedEngine
-	}
-	return additionalProps["engine"]
-}
-
-// resolveString converts interface{} to string
-func resolveString(v interface{}) string {
-	if s, ok := v.(string); ok {
-		return s
-	}
-	return ""
+	return parts[0], parts[1], parts[2], nil
 }

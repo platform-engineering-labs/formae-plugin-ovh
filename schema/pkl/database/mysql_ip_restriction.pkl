@@ -1,0 +1,52 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// OVH MySQL IP Restriction
+/// API: POST /cloud/project/{serviceName}/database/mysql/{clusterId}/ipRestriction
+module ovh.database.mysql_ip_restriction
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Database::MySQLIpRestriction"
+
+typealias IpRestrictionStatus = "CREATING"|"READY"|"PENDING"|"ERROR"|"DELETING"
+
+open class MySQLIpRestrictionResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  hidden ip: MySQLIpRestrictionResolvable = (this) { property = "ip" }
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "ip"
+}
+open class MySQLIpRestriction extends formae.Resource {
+  hidden parent = this
+
+  @ovh.FieldHint { required = true; createOnly = true }
+  serviceName: String
+
+  @ovh.FieldHint { required = true; createOnly = true }
+  clusterId: (String|formae.Resolvable)
+
+  /// IP block in CIDR notation
+  @ovh.FieldHint { required = true; createOnly = true }
+  ip: String
+
+  description: String?
+
+  // === Computed/Output fields ===
+
+  @ovh.FieldHint
+  status: IpRestrictionStatus?
+
+  hidden res: MySQLIpRestrictionResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}

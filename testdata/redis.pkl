@@ -1,0 +1,30 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@ovh/database/redis.pkl"
+
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new redis.Redis {
+    label = "plugin-sdk-test-redis"
+    serviceName = v.serviceName
+    version = "7.2"
+    plan = "essential"
+    flavor = "db1-4"
+    description = "Formae conformance test Redis cluster"
+    nodes {
+      new redis.Node {
+        region = v.shortRegion
+      }
+    }
+  }
+}

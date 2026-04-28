@@ -1,0 +1,52 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// OVH MySQL Database (schema within MySQL cluster)
+/// API: POST /cloud/project/{serviceName}/database/mysql/{clusterId}/database
+module ovh.database.mysql_database
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Database::MySQLDatabase"
+
+open class MySQLDatabaseResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  hidden id: MySQLDatabaseResolvable = (this) { property = "id" }
+
+  hidden name: MySQLDatabaseResolvable = (this) { property = "name" }
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class MySQLDatabase extends formae.Resource {
+  hidden parent = this
+
+  @ovh.FieldHint { required = true; createOnly = true }
+  serviceName: String
+
+  @ovh.FieldHint { required = true; createOnly = true }
+  clusterId: (String|formae.Resolvable)
+
+  @ovh.FieldHint { required = true; createOnly = true }
+  name: String
+
+  // === Computed/Output fields ===
+
+  @ovh.FieldHint
+  id: String?
+
+  @ovh.FieldHint
+  default: Boolean?
+
+  hidden res: MySQLDatabaseResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}

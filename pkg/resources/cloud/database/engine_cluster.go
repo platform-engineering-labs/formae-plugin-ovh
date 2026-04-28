@@ -10,24 +10,26 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 	"github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/prov"
-	"github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/registry"
 	ovhtransport "github.com/platform-engineering-labs/formae-plugin-ovh/pkg/transport/ovh"
+	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
-// ServiceResourceType is the resource type for database services/clusters.
-const ServiceResourceType = "OVH::Database::Service"
-
-// serviceProvisioner handles database service operations.
-// Service has special path: /cloud/project/{project}/database/{engine}[/{clusterId}]
-type serviceProvisioner struct {
+// engineClusterProvisioner manages a database cluster for a fixed engine
+// (e.g. mysql, postgresql). The engine is baked into the URL and is not
+// part of the native ID. Native ID format: "project/clusterId".
+type engineClusterProvisioner struct {
 	client *ovhtransport.Client
+	engine string
 }
 
-var _ prov.Provisioner = &serviceProvisioner{}
+var _ prov.Provisioner = &engineClusterProvisioner{}
 
-func (p *serviceProvisioner) Create(ctx context.Context, request *resource.CreateRequest) (*resource.CreateResult, error) {
+func newEngineClusterProvisioner(client *ovhtransport.Client, engine string) *engineClusterProvisioner {
+	return &engineClusterProvisioner{client: client, engine: engine}
+}
+
+func (p *engineClusterProvisioner) Create(ctx context.Context, request *resource.CreateRequest) (*resource.CreateResult, error) {
 	var props map[string]interface{}
 	if err := json.Unmarshal(request.Properties, &props); err != nil {
 		return createFailure(resource.OperationErrorCodeInvalidRequest,
@@ -35,22 +37,15 @@ func (p *serviceProvisioner) Create(ctx context.Context, request *resource.Creat
 	}
 
 	project := extractProject(request.TargetConfig, props)
-	engine, _ := props["engine"].(string)
-
-	if project == "" || engine == "" {
+	if project == "" {
 		return createFailure(resource.OperationErrorCodeInvalidRequest,
-			"serviceName and engine are required"), nil
+			"serviceName is required"), nil
 	}
 
-	// Build URL: POST /cloud/project/{project}/database/{engine}
-	url := fmt.Sprintf("/cloud/project/%s/database/%s", project, engine)
+	url := fmt.Sprintf("/cloud/project/%s/database/%s", project, p.engine)
 
-	// Strip serviceName and engine from body (they're in the URL)
-	body := filterProps(props, "serviceName", "engine")
-
-	// Transform nodesPattern.region to short format (DE1 → DE, GRA7 → GRA)
-	// OVH database API expects short region codes in nodesPattern
-	transformNodesPatternRegion(body)
+	body := filterProps(props, "serviceName", "id", "createdAt", "status", "networkType", "endpoints")
+	normalizeServiceCreateBody(body)
 
 	response, err := p.client.Do(ctx, ovhtransport.RequestOptions{
 		Method: "POST",
@@ -61,19 +56,15 @@ func (p *serviceProvisioner) Create(ctx context.Context, request *resource.Creat
 		return handleTransportError(err), nil
 	}
 
-	// Extract cluster ID from response
 	clusterID, _ := response.Body["id"].(string)
 	if clusterID == "" {
 		return createFailure(resource.OperationErrorCodeServiceInternalError,
 			"no cluster ID in response"), nil
 	}
 
-	// Native ID: project/engine/clusterId
-	nativeID := fmt.Sprintf("%s/%s/%s", project, engine, clusterID)
-
+	nativeID := fmt.Sprintf("%s/%s", project, clusterID)
 	propsJSON, _ := json.Marshal(response.Body)
 
-	// Return InProgress - Service creation is async, needs status polling
 	return &resource.CreateResult{
 		ProgressResult: &resource.ProgressResult{
 			Operation:          resource.OperationCreate,
@@ -84,18 +75,15 @@ func (p *serviceProvisioner) Create(ctx context.Context, request *resource.Creat
 	}, nil
 }
 
-func (p *serviceProvisioner) Read(ctx context.Context, request *resource.ReadRequest) (*resource.ReadResult, error) {
-	project, engine, clusterID, err := parseServiceNativeID(request.NativeID)
+func (p *engineClusterProvisioner) Read(ctx context.Context, request *resource.ReadRequest) (*resource.ReadResult, error) {
+	project, clusterID, err := parseEngineClusterNativeID(request.NativeID)
 	if err != nil {
 		return &resource.ReadResult{ErrorCode: resource.OperationErrorCodeInvalidRequest}, nil
 	}
 
-	url := fmt.Sprintf("/cloud/project/%s/database/%s/%s", project, engine, clusterID)
+	url := fmt.Sprintf("/cloud/project/%s/database/%s/%s", project, p.engine, clusterID)
 
-	response, err := p.client.Do(ctx, ovhtransport.RequestOptions{
-		Method: "GET",
-		Path:   url,
-	})
+	response, err := p.client.Do(ctx, ovhtransport.RequestOptions{Method: "GET", Path: url})
 	if err != nil {
 		if transportErr, ok := err.(*ovhtransport.Error); ok {
 			return &resource.ReadResult{
@@ -109,22 +97,20 @@ func (p *serviceProvisioner) Read(ctx context.Context, request *resource.ReadReq
 	return &resource.ReadResult{Properties: string(propsJSON)}, nil
 }
 
-func (p *serviceProvisioner) Update(ctx context.Context, request *resource.UpdateRequest) (*resource.UpdateResult, error) {
+func (p *engineClusterProvisioner) Update(ctx context.Context, request *resource.UpdateRequest) (*resource.UpdateResult, error) {
 	var props map[string]interface{}
 	if err := json.Unmarshal(request.DesiredProperties, &props); err != nil {
 		return updateFailure(request.NativeID, resource.OperationErrorCodeInvalidRequest,
 			fmt.Sprintf("failed to parse properties: %v", err)), nil
 	}
 
-	project, engine, clusterID, err := parseServiceNativeID(request.NativeID)
+	project, clusterID, err := parseEngineClusterNativeID(request.NativeID)
 	if err != nil {
 		return updateFailure(request.NativeID, resource.OperationErrorCodeInvalidRequest, err.Error()), nil
 	}
 
-	url := fmt.Sprintf("/cloud/project/%s/database/%s/%s", project, engine, clusterID)
-
-	// Strip immutable fields from body
-	body := filterProps(props, "serviceName", "engine")
+	url := fmt.Sprintf("/cloud/project/%s/database/%s/%s", project, p.engine, clusterID)
+	body := serviceUpdateBody(props)
 
 	response, err := p.client.Do(ctx, ovhtransport.RequestOptions{
 		Method: "PUT",
@@ -140,7 +126,6 @@ func (p *serviceProvisioner) Update(ctx context.Context, request *resource.Updat
 	}
 
 	propsJSON, _ := json.Marshal(response.Body)
-
 	return &resource.UpdateResult{
 		ProgressResult: &resource.ProgressResult{
 			Operation:          resource.OperationUpdate,
@@ -151,21 +136,17 @@ func (p *serviceProvisioner) Update(ctx context.Context, request *resource.Updat
 	}, nil
 }
 
-func (p *serviceProvisioner) Delete(ctx context.Context, request *resource.DeleteRequest) (*resource.DeleteResult, error) {
-	project, engine, clusterID, err := parseServiceNativeID(request.NativeID)
+func (p *engineClusterProvisioner) Delete(ctx context.Context, request *resource.DeleteRequest) (*resource.DeleteResult, error) {
+	project, clusterID, err := parseEngineClusterNativeID(request.NativeID)
 	if err != nil {
 		return deleteFailure(request.NativeID, resource.OperationErrorCodeInvalidRequest, err.Error()), nil
 	}
 
-	url := fmt.Sprintf("/cloud/project/%s/database/%s/%s", project, engine, clusterID)
+	url := fmt.Sprintf("/cloud/project/%s/database/%s/%s", project, p.engine, clusterID)
 
-	_, err = p.client.Do(ctx, ovhtransport.RequestOptions{
-		Method: "DELETE",
-		Path:   url,
-	})
+	_, err = p.client.Do(ctx, ovhtransport.RequestOptions{Method: "DELETE", Path: url})
 	if err != nil {
 		if transportErr, ok := err.(*ovhtransport.Error); ok {
-			// 404 is success for delete
 			if transportErr.Code == ovhtransport.ErrorCodeResourceNotFound {
 				return &resource.DeleteResult{
 					ProgressResult: &resource.ProgressResult{
@@ -184,61 +165,75 @@ func (p *serviceProvisioner) Delete(ctx context.Context, request *resource.Delet
 	return &resource.DeleteResult{
 		ProgressResult: &resource.ProgressResult{
 			Operation:       resource.OperationDelete,
-			OperationStatus: resource.OperationStatusSuccess,
+			OperationStatus: resource.OperationStatusInProgress,
+			RequestID:       deleteStatusRequestID(request.NativeID),
 			NativeID:        request.NativeID,
 		},
 	}, nil
 }
 
-func (p *serviceProvisioner) List(ctx context.Context, request *resource.ListRequest) (*resource.ListResult, error) {
+func (p *engineClusterProvisioner) List(ctx context.Context, request *resource.ListRequest) (*resource.ListResult, error) {
 	project := extractProjectFromAdditional(request.TargetConfig, request.AdditionalProperties)
-	engine := request.AdditionalProperties["engine"]
-
-	if project == "" || engine == "" {
+	if project == "" {
 		return &resource.ListResult{NativeIDs: nil}, nil
 	}
 
-	url := fmt.Sprintf("/cloud/project/%s/database/%s", project, engine)
+	url := fmt.Sprintf("/cloud/project/%s/database/%s", project, p.engine)
 
-	response, err := p.client.Do(ctx, ovhtransport.RequestOptions{
-		Method: "GET",
-		Path:   url,
-	})
+	response, err := p.client.Do(ctx, ovhtransport.RequestOptions{Method: "GET", Path: url})
 	if err != nil {
-		return nil, fmt.Errorf("failed to list services: %w", err)
+		return nil, fmt.Errorf("failed to list %s clusters: %w", p.engine, err)
 	}
 
 	var nativeIDs []string
 	for _, item := range response.BodyArray {
 		if id, ok := item.(string); ok {
-			nativeIDs = append(nativeIDs, fmt.Sprintf("%s/%s/%s", project, engine, id))
+			nativeIDs = append(nativeIDs, fmt.Sprintf("%s/%s", project, id))
 		}
 	}
-
 	return &resource.ListResult{NativeIDs: nativeIDs}, nil
 }
 
-func (p *serviceProvisioner) Status(ctx context.Context, request *resource.StatusRequest) (*resource.StatusResult, error) {
-	project, engine, clusterID, err := parseServiceNativeID(request.NativeID)
+func (p *engineClusterProvisioner) Status(ctx context.Context, request *resource.StatusRequest) (*resource.StatusResult, error) {
+	project, clusterID, err := parseEngineClusterNativeID(request.NativeID)
 	if err != nil {
 		return statusFailure(request, resource.OperationErrorCodeInvalidRequest, err.Error()), nil
 	}
 
-	url := fmt.Sprintf("/cloud/project/%s/database/%s/%s", project, engine, clusterID)
+	url := fmt.Sprintf("/cloud/project/%s/database/%s/%s", project, p.engine, clusterID)
 
-	response, err := p.client.Do(ctx, ovhtransport.RequestOptions{
-		Method: "GET",
-		Path:   url,
-	})
+	response, err := p.client.Do(ctx, ovhtransport.RequestOptions{Method: "GET", Path: url})
 	if err != nil {
 		if transportErr, ok := err.(*ovhtransport.Error); ok {
+			if isDeleteStatusRequest(request) && transportErr.Code == ovhtransport.ErrorCodeResourceNotFound {
+				return &resource.StatusResult{
+					ProgressResult: &resource.ProgressResult{
+						Operation:       resource.OperationDelete,
+						OperationStatus: resource.OperationStatusSuccess,
+						RequestID:       request.RequestID,
+						NativeID:        request.NativeID,
+					},
+				}, nil
+			}
 			return statusFailure(request, ovhtransport.ToResourceErrorCode(transportErr.Code),
 				transportErr.Message), nil
 		}
 		return statusFailure(request, resource.OperationErrorCodeServiceInternalError, err.Error()), nil
 	}
 
-	// Check if service is READY
+	if isDeleteStatusRequest(request) {
+		status, _ := response.Body["status"].(string)
+		return &resource.StatusResult{
+			ProgressResult: &resource.ProgressResult{
+				Operation:       resource.OperationDelete,
+				OperationStatus: resource.OperationStatusInProgress,
+				StatusMessage:   fmt.Sprintf("Service deletion in progress; status: %s", status),
+				RequestID:       request.RequestID,
+				NativeID:        request.NativeID,
+			},
+		}, nil
+	}
+
 	status, _ := response.Body["status"].(string)
 	if status != "READY" {
 		return &resource.StatusResult{
@@ -253,7 +248,6 @@ func (p *serviceProvisioner) Status(ctx context.Context, request *resource.Statu
 	}
 
 	propsJSON, _ := json.Marshal(response.Body)
-
 	return &resource.StatusResult{
 		ProgressResult: &resource.ProgressResult{
 			Operation:          resource.OperationCheckStatus,
@@ -265,28 +259,11 @@ func (p *serviceProvisioner) Status(ctx context.Context, request *resource.Statu
 	}, nil
 }
 
-// parseServiceNativeID parses "project/engine/clusterId" format
-func parseServiceNativeID(nativeID string) (project, engine, clusterID string, err error) {
-	parts := strings.SplitN(nativeID, "/", 3)
-	if len(parts) != 3 {
-		return "", "", "", fmt.Errorf("invalid service native ID: %s", nativeID)
+// parseEngineClusterNativeID parses "project/clusterId" format.
+func parseEngineClusterNativeID(nativeID string) (project, clusterID string, err error) {
+	parts := strings.SplitN(nativeID, "/", 2)
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("invalid cluster native ID: %s", nativeID)
 	}
-	return parts[0], parts[1], parts[2], nil
-}
-
-func init() {
-	registry.Register(
-		ServiceResourceType,
-		[]resource.Operation{
-			resource.OperationCreate,
-			resource.OperationRead,
-			resource.OperationUpdate,
-			resource.OperationDelete,
-			resource.OperationList,
-			resource.OperationCheckStatus,
-		},
-		func(client *ovhtransport.Client) prov.Provisioner {
-			return &serviceProvisioner{client: client}
-		},
-	)
+	return parts[0], parts[1], nil
 }

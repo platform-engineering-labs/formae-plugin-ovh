@@ -4,26 +4,24 @@
  * SPDX-License-Identifier: FSL-1.1-ALv2
  */
 
-/// OVH Kafka ACL
-module ovh.database.kafka_acl
+/// OVH KafkaConnect IP Restriction
+module ovh.database.kafka_connect_ip_restriction
 
 import "@formae/formae.pkl"
 import "../ovh.pkl"
 
-const type = "OVH::Database::KafkaAcl"
+const type = "OVH::Database::KafkaConnectIpRestriction"
 
-typealias AclPermission = "read"|"write"|"readwrite"|"admin"
-
-open class KafkaAclResolvable extends formae.Resolvable {
+open class KafkaConnectIpRestrictionResolvable extends formae.Resolvable {
   hidden type = module.type
-  hidden id: KafkaAclResolvable = (this) { property = "id" }
+  hidden ip: KafkaConnectIpRestrictionResolvable = (this) { property = "ip" }
 }
 
 @ovh.ResourceHint {
   type = module.type
-  identifier = "id"
+  identifier = "ip"
 }
-open class KafkaAcl extends formae.Resource {
+open class KafkaConnectIpRestriction extends formae.Resource {
   hidden parent = this
 
   @ovh.FieldHint { required = true; createOnly = true }
@@ -33,18 +31,14 @@ open class KafkaAcl extends formae.Resource {
   clusterId: (String|formae.Resolvable)
 
   @ovh.FieldHint { required = true; createOnly = true }
-  permission: AclPermission
+  ip: String
 
-  @ovh.FieldHint { required = true; createOnly = true }
-  topic: String
-
-  @ovh.FieldHint { required = true; createOnly = true }
-  username: String
+  description: String?
 
   @ovh.FieldHint { hasProviderDefault = true }
-  id: String?
+  status: String?
 
-  hidden res: KafkaAclResolvable = new {
+  hidden res: KafkaConnectIpRestrictionResolvable = new {
     label = parent.label
     stack = parent.stack?.label
   }

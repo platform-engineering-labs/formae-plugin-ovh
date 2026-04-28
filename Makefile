@@ -99,8 +99,11 @@ setup-credentials:
 clean-environment:
 	@./scripts/ci/clean-environment.sh
 
-# Normalize TIMEOUT: bare digits (legacy minutes form) get "m" appended.
-TEST_TIMEOUT := $(if $(TIMEOUT),$(if $(shell echo $(TIMEOUT) | grep -E '^[0-9]+$$'),$(TIMEOUT)m,$(TIMEOUT)),30m)
+# Normalize TIMEOUT: bare digits configure operation timeout minutes. Give the
+# Go test process more wall-clock time because CRUD runs multiple operations.
+TEST_TIMEOUT := $(if $(TIMEOUT),$(if $(shell echo $(TIMEOUT) | grep -E '^[0-9]+$$'),$(shell expr $(TIMEOUT) \* 2)m,$(TIMEOUT)),30m)
+CONFORMANCE_OPERATION_TIMEOUT := $(if $(TIMEOUT),$(shell echo $(TIMEOUT) | sed 's/m$$//'),30)
+CONFORMANCE_FORMAE_VERSION := $(if $(VERSION),$(VERSION),$(shell pkl eval -x 'minFormaeVersion' formae-plugin.pkl 2>/dev/null || echo 0.84.0))
 
 ## conformance-test: Run all conformance tests (CRUD + discovery)
 ## Usage: make conformance-test [TEST=s3-bucket] [TIMEOUT=30m]
@@ -114,7 +117,7 @@ conformance-test-crud: install setup-credentials
 	@./scripts/ci/clean-environment.sh || true
 	@echo ""
 	@echo "Running CRUD conformance tests..."
-	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=crud \
+	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=crud FORMAE_TEST_TIMEOUT="$(CONFORMANCE_OPERATION_TIMEOUT)" FORMAE_VERSION="$(CONFORMANCE_FORMAE_VERSION)" \
 		$(GO) test -tags=conformance -v -timeout $(TEST_TIMEOUT) ./...; \
 	TEST_EXIT=$$?; \
 	echo ""; \
@@ -129,7 +132,7 @@ conformance-test-discovery: install setup-credentials
 	@./scripts/ci/clean-environment.sh || true
 	@echo ""
 	@echo "Running discovery conformance tests..."
-	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=discovery \
+	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=discovery FORMAE_TEST_TIMEOUT="$(CONFORMANCE_OPERATION_TIMEOUT)" FORMAE_VERSION="$(CONFORMANCE_FORMAE_VERSION)" \
 		$(GO) test -tags=conformance -v -timeout $(TEST_TIMEOUT) ./...; \
 	TEST_EXIT=$$?; \
 	echo ""; \
@@ -141,12 +144,12 @@ conformance-test-discovery: install setup-credentials
 ## Used by CI matrix jobs where cleanup is managed separately.
 conformance-test-crud-run:
 	@echo "Running CRUD conformance tests..."
-	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=crud \
+	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=crud FORMAE_TEST_TIMEOUT="$(CONFORMANCE_OPERATION_TIMEOUT)" FORMAE_VERSION="$(CONFORMANCE_FORMAE_VERSION)" \
 		$(GO) test -tags=conformance -v -timeout $(TEST_TIMEOUT) ./...
 
 ## conformance-test-discovery-run: Run only discovery tests (no cleanup)
 ## Used by CI matrix jobs where cleanup is managed separately.
 conformance-test-discovery-run:
 	@echo "Running discovery conformance tests..."
-	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=discovery \
+	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=discovery FORMAE_TEST_TIMEOUT="$(CONFORMANCE_OPERATION_TIMEOUT)" FORMAE_VERSION="$(CONFORMANCE_FORMAE_VERSION)" \
 		$(GO) test -tags=conformance -v -timeout $(TEST_TIMEOUT) ./...

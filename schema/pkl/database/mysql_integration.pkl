@@ -1,0 +1,64 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// OVH MySQL Database Integration
+/// API: POST /cloud/project/{serviceName}/database/mysql/{clusterId}/integration
+module ovh.database.mysql_integration
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Database::MySQLIntegration"
+
+typealias IntegrationStatus = "CREATING"|"READY"|"PENDING"|"ERROR"|"DELETING"
+
+open class MySQLIntegrationResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  hidden id: MySQLIntegrationResolvable = (this) { property = "id" }
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class MySQLIntegration extends formae.Resource {
+  hidden parent = this
+
+  @ovh.FieldHint { required = true; createOnly = true }
+  serviceName: String
+
+  @ovh.FieldHint { required = true; createOnly = true }
+  clusterId: (String|formae.Resolvable)
+
+  /// Integration type
+  @ovh.FieldHint { required = true; createOnly = true }
+  type: String
+
+  /// Destination service ID
+  @ovh.FieldHint { required = true; createOnly = true }
+  destinationServiceId: (String|formae.Resolvable)
+
+  /// Source service ID
+  @ovh.FieldHint { required = true; createOnly = true }
+  sourceServiceId: (String|formae.Resolvable)
+
+  /// Integration-specific parameters
+  parameters: Mapping<String, String>?
+
+  // === Computed/Output fields ===
+
+  @ovh.FieldHint
+  id: String?
+
+  @ovh.FieldHint
+  status: IntegrationStatus?
+
+  hidden res: MySQLIntegrationResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}

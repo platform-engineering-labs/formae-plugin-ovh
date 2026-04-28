@@ -1,0 +1,128 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// OVH Managed M3DB Cluster
+/// API: POST /cloud/project/{serviceName}/database/m3db
+module ovh.database.m3db
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Database::M3DB"
+
+typealias ServiceStatus = "CREATING"|"READY"|"PENDING"|"MAINTENANCE"|"ERROR"|"DELETING"
+
+open class M3DBResolvable extends formae.Resolvable {
+  hidden type = module.type
+  hidden id: M3DBResolvable = (this) { property = "id" }
+  hidden endpoints: M3DBResolvable = (this) { property = "endpoints" }
+}
+
+@ovh.SubResourceHint
+open class Node extends formae.SubResource {
+  @ovh.FieldHint { required = true; createOnly = true }
+  region: String
+
+  @ovh.FieldHint { createOnly = true }
+  networkId: String?
+
+  @ovh.FieldHint { createOnly = true }
+  subnetId: String?
+
+  @ovh.FieldHint { hasProviderDefault = true }
+  id: String?
+  @ovh.FieldHint { hasProviderDefault = true }
+  name: String?
+  @ovh.FieldHint { hasProviderDefault = true }
+  flavor: String?
+  @ovh.FieldHint { hasProviderDefault = true }
+  port: Int?
+  @ovh.FieldHint { hasProviderDefault = true }
+  status: String?
+  @ovh.FieldHint { hasProviderDefault = true }
+  createdAt: String?
+  @ovh.FieldHint { hasProviderDefault = true }
+  role: String?
+}
+
+@ovh.SubResourceHint
+open class Backup extends formae.SubResource {
+  regions: Listing<String>?
+  time: String?
+}
+
+@ovh.SubResourceHint
+open class Disk extends formae.SubResource {
+  size: Int?
+  @ovh.FieldHint { hasProviderDefault = true }
+  type: String?
+}
+
+@ovh.SubResourceHint
+open class Endpoint extends formae.SubResource {
+  @ovh.FieldHint { hasProviderDefault = true }
+  component: String?
+  @ovh.FieldHint { hasProviderDefault = true }
+  domain: String?
+  @ovh.FieldHint { hasProviderDefault = true }
+  path: String?
+  @ovh.FieldHint { hasProviderDefault = true }
+  port: Int?
+  @ovh.FieldHint { hasProviderDefault = true }
+  scheme: String?
+  @ovh.FieldHint { hasProviderDefault = true }
+  ssl: Boolean?
+  @ovh.FieldHint { hasProviderDefault = true }
+  sslMode: String?
+  @ovh.FieldHint { hasProviderDefault = true }
+  uri: String?
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class M3DB extends formae.Resource {
+  hidden parent = this
+
+  @ovh.FieldHint { required = true; createOnly = true }
+  serviceName: String
+
+  @ovh.FieldHint { required = true }
+  version: String
+
+  @ovh.FieldHint { required = true }
+  plan: String
+
+  @ovh.FieldHint { required = true }
+  flavor: String
+
+  @ovh.FieldHint { required = true }
+  nodes: Listing<Node>
+
+  description: String?
+  disk: Disk?
+  backup: Backup?
+  maintenanceTime: String?
+  deletionProtection: Boolean?
+  advancedConfiguration: Mapping<String, String>?
+
+  @ovh.FieldHint { hasProviderDefault = true }
+  id: String?
+  @ovh.FieldHint { hasProviderDefault = true }
+  createdAt: String?
+  @ovh.FieldHint { hasProviderDefault = true }
+  status: ServiceStatus?
+  @ovh.FieldHint { hasProviderDefault = true }
+  networkType: String?
+  @ovh.FieldHint { hasProviderDefault = true }
+  endpoints: Listing<Endpoint>?
+
+  hidden res: M3DBResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}

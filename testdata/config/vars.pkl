@@ -53,5 +53,6 @@ target = new formae.Target {
     // OVH REST API credentials
     ovhEndpoint = read?("env:OVH_ENDPOINT") ?? "ovh-eu"
     region = read?("env:OS_REGION_NAME") ?? "DE1"
+    projectId = serviceName
   }
 }

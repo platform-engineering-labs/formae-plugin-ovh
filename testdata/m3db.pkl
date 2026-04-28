@@ -1,0 +1,30 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@ovh/database/m3db.pkl"
+
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new m3db.M3DB {
+    label = "plugin-sdk-test-m3db"
+    serviceName = v.serviceName
+    version = "1.5"
+    plan = "essential"
+    flavor = "db1-7"
+    description = "Formae conformance test M3DB cluster"
+    nodes {
+      new m3db.Node {
+        region = v.shortRegion
+      }
+    }
+  }
+}

@@ -40,3 +40,8 @@ CLAUDE.md
 
 # Worktrees
 .worktrees/
+
+# Test logs
+*.log
+sequential.log
+

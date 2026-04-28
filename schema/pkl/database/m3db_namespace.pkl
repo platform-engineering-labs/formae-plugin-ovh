@@ -4,26 +4,25 @@
  * SPDX-License-Identifier: FSL-1.1-ALv2
  */
 
-/// OVH Kafka ACL
-module ovh.database.kafka_acl
+/// OVH M3DB Namespace
+module ovh.database.m3db_namespace
 
 import "@formae/formae.pkl"
 import "../ovh.pkl"
 
-const type = "OVH::Database::KafkaAcl"
+const type = "OVH::Database::M3DBNamespace"
 
-typealias AclPermission = "read"|"write"|"readwrite"|"admin"
-
-open class KafkaAclResolvable extends formae.Resolvable {
+open class M3DBNamespaceResolvable extends formae.Resolvable {
   hidden type = module.type
-  hidden id: KafkaAclResolvable = (this) { property = "id" }
+  hidden id: M3DBNamespaceResolvable = (this) { property = "id" }
+  hidden name: M3DBNamespaceResolvable = (this) { property = "name" }
 }
 
 @ovh.ResourceHint {
   type = module.type
   identifier = "id"
 }
-open class KafkaAcl extends formae.Resource {
+open class M3DBNamespace extends formae.Resource {
   hidden parent = this
 
   @ovh.FieldHint { required = true; createOnly = true }
@@ -33,18 +32,17 @@ open class KafkaAcl extends formae.Resource {
   clusterId: (String|formae.Resolvable)
 
   @ovh.FieldHint { required = true; createOnly = true }
-  permission: AclPermission
+  name: String
 
-  @ovh.FieldHint { required = true; createOnly = true }
-  topic: String
-
-  @ovh.FieldHint { required = true; createOnly = true }
-  username: String
+  resolution: String?
+  retention: String?
+  snapshotEnabled: Boolean?
+  writesToCommitLogEnabled: Boolean?
 
   @ovh.FieldHint { hasProviderDefault = true }
   id: String?
 
-  hidden res: KafkaAclResolvable = new {
+  hidden res: M3DBNamespaceResolvable = new {
     label = parent.label
     stack = parent.stack?.label
   }

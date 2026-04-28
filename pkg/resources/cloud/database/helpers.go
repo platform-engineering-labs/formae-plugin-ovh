@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 	"github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/base"
 	ovhtransport "github.com/platform-engineering-labs/formae-plugin-ovh/pkg/transport/ovh"
+	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
 // extractProject extracts project from target config or props
@@ -78,6 +78,24 @@ func filterProps(props map[string]interface{}, keys ...string) map[string]interf
 	return result
 }
 
+func serviceUpdateBody(props map[string]interface{}) map[string]interface{} {
+	body := make(map[string]interface{})
+	for _, key := range []string{"description", "maintenanceTime", "deletionProtection"} {
+		if value, ok := props[key]; ok && value != nil {
+			body[key] = value
+		}
+	}
+	return body
+}
+
+func deleteStatusRequestID(nativeID string) string {
+	return "delete:" + nativeID
+}
+
+func isDeleteStatusRequest(request *resource.StatusRequest) bool {
+	return strings.HasPrefix(request.RequestID, "delete:")
+}
+
 // parseNestedNativeID parses "project/engine/clusterId/resourceId" format
 func parseNestedNativeID(nativeID string) (project, engine, clusterID, resourceID string, err error) {
 	parts := strings.SplitN(nativeID, "/", 4)
@@ -139,12 +157,47 @@ func statusFailure(request *resource.StatusRequest, errorCode resource.Operation
 	}
 }
 
+// resolveString converts interface{} to string.
+func resolveString(v interface{}) string {
+	if s, ok := v.(string); ok {
+		return s
+	}
+	return ""
+}
+
 // handleTransportError converts transport errors to CreateResult
 func handleTransportError(err error) *resource.CreateResult {
 	if transportErr, ok := err.(*ovhtransport.Error); ok {
 		return createFailure(ovhtransport.ToResourceErrorCode(transportErr.Code), transportErr.Message)
 	}
 	return createFailure(resource.OperationErrorCodeServiceInternalError, err.Error())
+}
+
+// normalizeServiceCreateBody adapts the PKL-facing database service shape to
+// the OVH create API shape. The schema exposes nodes as a list, but OVH expects
+// nodesPattern: {flavor, number, region}.
+func normalizeServiceCreateBody(body map[string]interface{}) {
+	if nodes, ok := body["nodes"].([]interface{}); ok && len(nodes) > 0 {
+		nodesPattern := map[string]interface{}{
+			"number": len(nodes),
+		}
+		if flavor, ok := body["flavor"]; ok {
+			nodesPattern["flavor"] = flavor
+		}
+		if firstNode, ok := nodes[0].(map[string]interface{}); ok {
+			for _, key := range []string{"region", "networkId", "subnetId"} {
+				if value, ok := firstNode[key]; ok && value != nil {
+					nodesPattern[key] = value
+				}
+			}
+		}
+
+		body["nodesPattern"] = nodesPattern
+		delete(body, "nodes")
+		delete(body, "flavor")
+	}
+
+	transformNodesPatternRegion(body)
 }
 
 // transformNodesPatternRegion transforms region in nodesPattern to short format.

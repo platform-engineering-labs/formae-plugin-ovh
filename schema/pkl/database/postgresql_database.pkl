@@ -4,26 +4,25 @@
  * SPDX-License-Identifier: FSL-1.1-ALv2
  */
 
-/// OVH Kafka ACL
-module ovh.database.kafka_acl
+/// OVH PostgreSQL Database (schema within cluster)
+module ovh.database.postgresql_database
 
 import "@formae/formae.pkl"
 import "../ovh.pkl"
 
-const type = "OVH::Database::KafkaAcl"
+const type = "OVH::Database::PostgreSQLDatabase"
 
-typealias AclPermission = "read"|"write"|"readwrite"|"admin"
-
-open class KafkaAclResolvable extends formae.Resolvable {
+open class PostgreSQLDatabaseResolvable extends formae.Resolvable {
   hidden type = module.type
-  hidden id: KafkaAclResolvable = (this) { property = "id" }
+  hidden id: PostgreSQLDatabaseResolvable = (this) { property = "id" }
+  hidden name: PostgreSQLDatabaseResolvable = (this) { property = "name" }
 }
 
 @ovh.ResourceHint {
   type = module.type
   identifier = "id"
 }
-open class KafkaAcl extends formae.Resource {
+open class PostgreSQLDatabase extends formae.Resource {
   hidden parent = this
 
   @ovh.FieldHint { required = true; createOnly = true }
@@ -33,18 +32,14 @@ open class KafkaAcl extends formae.Resource {
   clusterId: (String|formae.Resolvable)
 
   @ovh.FieldHint { required = true; createOnly = true }
-  permission: AclPermission
-
-  @ovh.FieldHint { required = true; createOnly = true }
-  topic: String
-
-  @ovh.FieldHint { required = true; createOnly = true }
-  username: String
+  name: String
 
   @ovh.FieldHint { hasProviderDefault = true }
   id: String?
+  @ovh.FieldHint { hasProviderDefault = true }
+  default: Boolean?
 
-  hidden res: KafkaAclResolvable = new {
+  hidden res: PostgreSQLDatabaseResolvable = new {
     label = parent.label
     stack = parent.stack?.label
   }

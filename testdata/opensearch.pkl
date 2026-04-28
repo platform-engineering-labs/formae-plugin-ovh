@@ -1,0 +1,30 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@ovh/database/opensearch.pkl"
+
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new opensearch.OpenSearch {
+    label = "plugin-sdk-test-opensearch"
+    serviceName = v.serviceName
+    version = "2"
+    plan = "essential"
+    flavor = "db1-4"
+    description = "Formae conformance test OpenSearch cluster"
+    nodes {
+      new opensearch.Node {
+        region = v.shortRegion
+      }
+    }
+  }
+}

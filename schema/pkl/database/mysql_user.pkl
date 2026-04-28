@@ -1,0 +1,66 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// OVH MySQL Database User
+/// API: POST /cloud/project/{serviceName}/database/mysql/{clusterId}/user
+module ovh.database.mysql_user
+
+import "@formae/formae.pkl"
+import "../ovh.pkl"
+
+const type = "OVH::Database::MySQLUser"
+
+typealias UserStatus = "CREATING"|"READY"|"PENDING"|"ERROR"|"DELETING"
+
+open class MySQLUserResolvable extends formae.Resolvable {
+  hidden type = module.type
+
+  hidden id: MySQLUserResolvable = (this) { property = "id" }
+
+  hidden username: MySQLUserResolvable = (this) { property = "username" }
+
+  hidden password: MySQLUserResolvable = (this) { property = "password" }
+}
+
+@ovh.ResourceHint {
+  type = module.type
+  identifier = "id"
+}
+open class MySQLUser extends formae.Resource {
+  hidden parent = this
+
+  @ovh.FieldHint { required = true; createOnly = true }
+  serviceName: String
+
+  @ovh.FieldHint { required = true; createOnly = true }
+  clusterId: (String|formae.Resolvable)
+
+  /// Username
+  @ovh.FieldHint { required = true; createOnly = true }
+  name: String
+
+  // === Computed/Output fields ===
+
+  @ovh.FieldHint
+  id: String?
+
+  @ovh.FieldHint
+  username: String?
+
+  @ovh.FieldHint
+  password: String?
+
+  @ovh.FieldHint
+  createdAt: String?
+
+  @ovh.FieldHint
+  status: UserStatus?
+
+  hidden res: MySQLUserResolvable = new {
+    label = parent.label
+    stack = parent.stack?.label
+  }
+}

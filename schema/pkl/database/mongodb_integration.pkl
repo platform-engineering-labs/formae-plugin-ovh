@@ -4,26 +4,24 @@
  * SPDX-License-Identifier: FSL-1.1-ALv2
  */
 
-/// OVH Kafka ACL
-module ovh.database.kafka_acl
+/// OVH MongoDB Integration
+module ovh.database.mongodb_integration
 
 import "@formae/formae.pkl"
 import "../ovh.pkl"
 
-const type = "OVH::Database::KafkaAcl"
+const type = "OVH::Database::MongoDBIntegration"
 
-typealias AclPermission = "read"|"write"|"readwrite"|"admin"
-
-open class KafkaAclResolvable extends formae.Resolvable {
+open class MongoDBIntegrationResolvable extends formae.Resolvable {
   hidden type = module.type
-  hidden id: KafkaAclResolvable = (this) { property = "id" }
+  hidden id: MongoDBIntegrationResolvable = (this) { property = "id" }
 }
 
 @ovh.ResourceHint {
   type = module.type
   identifier = "id"
 }
-open class KafkaAcl extends formae.Resource {
+open class MongoDBIntegration extends formae.Resource {
   hidden parent = this
 
   @ovh.FieldHint { required = true; createOnly = true }
@@ -33,18 +31,22 @@ open class KafkaAcl extends formae.Resource {
   clusterId: (String|formae.Resolvable)
 
   @ovh.FieldHint { required = true; createOnly = true }
-  permission: AclPermission
+  type: String
 
   @ovh.FieldHint { required = true; createOnly = true }
-  topic: String
+  destinationServiceId: (String|formae.Resolvable)
 
   @ovh.FieldHint { required = true; createOnly = true }
-  username: String
+  sourceServiceId: (String|formae.Resolvable)
+
+  parameters: Mapping<String, String>?
 
   @ovh.FieldHint { hasProviderDefault = true }
   id: String?
+  @ovh.FieldHint { hasProviderDefault = true }
+  status: String?
 
-  hidden res: KafkaAclResolvable = new {
+  hidden res: MongoDBIntegrationResolvable = new {
     label = parent.label
     stack = parent.stack?.label
   }

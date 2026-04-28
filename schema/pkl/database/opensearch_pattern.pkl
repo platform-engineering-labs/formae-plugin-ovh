@@ -4,26 +4,24 @@
  * SPDX-License-Identifier: FSL-1.1-ALv2
  */
 
-/// OVH Kafka ACL
-module ovh.database.kafka_acl
+/// OVH OpenSearch Index Pattern
+module ovh.database.opensearch_pattern
 
 import "@formae/formae.pkl"
 import "../ovh.pkl"
 
-const type = "OVH::Database::KafkaAcl"
+const type = "OVH::Database::OpenSearchPattern"
 
-typealias AclPermission = "read"|"write"|"readwrite"|"admin"
-
-open class KafkaAclResolvable extends formae.Resolvable {
+open class OpenSearchPatternResolvable extends formae.Resolvable {
   hidden type = module.type
-  hidden id: KafkaAclResolvable = (this) { property = "id" }
+  hidden id: OpenSearchPatternResolvable = (this) { property = "id" }
 }
 
 @ovh.ResourceHint {
   type = module.type
   identifier = "id"
 }
-open class KafkaAcl extends formae.Resource {
+open class OpenSearchPattern extends formae.Resource {
   hidden parent = this
 
   @ovh.FieldHint { required = true; createOnly = true }
@@ -33,18 +31,14 @@ open class KafkaAcl extends formae.Resource {
   clusterId: (String|formae.Resolvable)
 
   @ovh.FieldHint { required = true; createOnly = true }
-  permission: AclPermission
+  pattern: String
 
-  @ovh.FieldHint { required = true; createOnly = true }
-  topic: String
-
-  @ovh.FieldHint { required = true; createOnly = true }
-  username: String
+  maxIndexCount: Int?
 
   @ovh.FieldHint { hasProviderDefault = true }
   id: String?
 
-  hidden res: KafkaAclResolvable = new {
+  hidden res: OpenSearchPatternResolvable = new {
     label = parent.label
     stack = parent.stack?.label
   }

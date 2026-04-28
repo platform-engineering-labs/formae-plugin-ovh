@@ -1,0 +1,30 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@ovh/database/cassandra.pkl"
+
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new cassandra.Cassandra {
+    label = "plugin-sdk-test-cassandra"
+    serviceName = v.serviceName
+    version = "4"
+    plan = "business"
+    flavor = "db1-15"
+    description = "Formae conformance test Cassandra cluster"
+    nodes {
+      new cassandra.Node {
+        region = v.shortRegion
+      }
+    }
+  }
+}
