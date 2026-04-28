@@ -44,24 +44,31 @@ open class Oidc extends formae.Resource {
   issuerUrl: String
 
   /// JWT claim to use as the user name
+  @ovh.FieldHint { hasProviderDefault = true }
   usernameClaim: String?
 
   /// Prefix for username claims
+  @ovh.FieldHint { hasProviderDefault = true }
   usernamePrefix: String?
 
   /// JWT claim to use as the user's groups
+  @ovh.FieldHint { hasProviderDefault = true }
   groupsClaim: Listing<String>?
 
   /// Prefix for group claims
+  @ovh.FieldHint { hasProviderDefault = true }
   groupsPrefix: String?
 
   /// Required claims (key-value pairs that must be present)
+  @ovh.FieldHint { hasProviderDefault = true }
   requiredClaim: Listing<String>?
 
   /// Signing algorithms accepted (default: RS256)
+  @ovh.FieldHint { hasProviderDefault = true }
   signingAlgorithms: Listing<String>?
 
   /// PEM-encoded CA certificate for OIDC provider
+  @ovh.FieldHint { hasProviderDefault = true }
   caContent: String?
 
   hidden res: OidcResolvable = new {

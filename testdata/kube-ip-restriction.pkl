@@ -1,0 +1,36 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@formae/formae.pkl"
+
+import "@ovh/kube/cluster.pkl"
+import "@ovh/kube/ip_restriction_kube.pkl"
+
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  // Kubernetes cluster for the IP restriction
+  local testCluster = new cluster.Cluster {
+    label = "plugin-sdk-test-kubeiprestriction-cluster"
+    serviceName = v.serviceName
+    name = "formae-ipr-\(v.testRunID)"
+    region = v.region
+    updatePolicy = "NEVER_UPDATE"
+  }
+  testCluster
+
+  new ip_restriction_kube.IpRestriction {
+    label = "plugin-sdk-test-kubeiprestriction"
+    serviceName = v.serviceName
+    kubeId = testCluster.res.id
+    ip = "192.0.2.0/24"
+  }
+}

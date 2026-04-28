@@ -130,7 +130,7 @@ open class Cluster extends formae.Resource {
   /// `new formae.Value { value = "1.33"; strategy = "SetOnce" }` when targeting
   /// a minor version — OVH picks the current patch (e.g. returns "1.33.10-1")
   /// and SetOnce tells the renderer not to re-compare the value on read.
-  @ovh.FieldHint { required = true }
+  @ovh.FieldHint { hasProviderDefault = true }
   version: (String|formae.Value)?
 
   /// Cluster plan (empty for default)

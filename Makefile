@@ -100,21 +100,49 @@ clean-environment:
 	@./scripts/ci/clean-environment.sh
 
 # Normalize TIMEOUT: bare digits (legacy minutes form) get "m" appended.
-TEST_TIMEOUT := $(if $(TIMEOUT),$(if $(shell echo $(TIMEOUT) | grep -E '^[0-9]+$$'),$(TIMEOUT)m,$(TIMEOUT)),30m)
+# The default has to be > FORMAE_TIMEOUT + OOB_TIMEOUT + OOB_DELETE_TIMEOUT
+# so a slow kube test doesn't get killed by the outer go-test wrapper before
+# the inner per-phase budgets can play out.
+TEST_TIMEOUT := $(if $(TIMEOUT),$(if $(shell echo $(TIMEOUT) | grep -E '^[0-9]+$$'),$(TIMEOUT)m,$(TIMEOUT)),120m)
+
+# OVH managed Kubernetes is slow:
+#   - cluster create normally takes 2-3 min, but US-EAST-VA-1 has been observed
+#     to keep a fresh nodepool in INSTALLING for 10-15 min under load
+#   - cluster delete tears the control plane down over a similar window
+#   - the OOB-delete phase recreates a cluster *and* exercises Delete on it, so
+#     two of those windows back-to-back fit inside one OOB plugin RPC
+#
+# FORMAE_TIMEOUT: bounds the framework's per-operation wait
+# (PollStatus / WaitForResourceCompletion). Default 15 min — kube cluster
+# create+nodepool-installing has been observed at 10-12 min on US-EAST-VA-1.
+# OOB_TIMEOUT: bounds a single OOB Create/Delete plugin RPC. 15 min is enough
+# headroom for a slow OVH region without hiding genuine plugin hangs.
+# OOB_DELETE_TIMEOUT: bounds the post-sync inventory tombstone wait. The plugin
+# Delete has already returned by this point; what we wait for here is OVH's GET
+# eventually reflecting the deletion — for kube clusters that is 5-10 min.
+FORMAE_TIMEOUT ?= 50
+OOB_TIMEOUT ?= 15
+OOB_DELETE_TIMEOUT ?= 30
+DISCOVERY_TIMEOUT ?= 50
+KUBE_TEST_ENV := FORMAE_TEST_TIMEOUT=$(FORMAE_TIMEOUT) \
+	$(if $(OOB_TIMEOUT),FORMAE_TEST_OOB_TIMEOUT=$(OOB_TIMEOUT)) \
+	$(if $(OOB_DELETE_TIMEOUT),FORMAE_TEST_OOB_DELETE_TIMEOUT=$(OOB_DELETE_TIMEOUT)) \
+	$(if $(DISCOVERY_TIMEOUT),FORMAE_TEST_DISCOVERY_TIMEOUT=$(DISCOVERY_TIMEOUT)) \
+	FORMAE_LOG_PLUGINS=debug
 
 ## conformance-test: Run all conformance tests (CRUD + discovery)
-## Usage: make conformance-test [TEST=s3-bucket] [TIMEOUT=30m]
+## Usage: make conformance-test [TEST=s3-bucket] [TIMEOUT=30m] [OOB_TIMEOUT=30] [OOB_DELETE_TIMEOUT=2]
 ## Calls clean-environment before and after tests.
 conformance-test: conformance-test-crud conformance-test-discovery
 
 ## conformance-test-crud: Run only CRUD lifecycle tests
-## Usage: make conformance-test-crud [TEST=s3-bucket] [TIMEOUT=30m]
+## Usage: make conformance-test-crud [TEST=s3-bucket] [TIMEOUT=30m] [OOB_TIMEOUT=30] [OOB_DELETE_TIMEOUT=2]
 conformance-test-crud: install setup-credentials
 	@echo "Pre-test cleanup..."
 	@./scripts/ci/clean-environment.sh || true
 	@echo ""
 	@echo "Running CRUD conformance tests..."
-	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=crud \
+	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=crud $(KUBE_TEST_ENV) \
 		$(GO) test -tags=conformance -v -timeout $(TEST_TIMEOUT) ./...; \
 	TEST_EXIT=$$?; \
 	echo ""; \
@@ -123,13 +151,13 @@ conformance-test-crud: install setup-credentials
 	exit $$TEST_EXIT
 
 ## conformance-test-discovery: Run only discovery tests
-## Usage: make conformance-test-discovery [TEST=s3-bucket] [TIMEOUT=30m]
+## Usage: make conformance-test-discovery [TEST=s3-bucket] [TIMEOUT=30m] [OOB_TIMEOUT=30]
 conformance-test-discovery: install setup-credentials
 	@echo "Pre-test cleanup..."
 	@./scripts/ci/clean-environment.sh || true
 	@echo ""
 	@echo "Running discovery conformance tests..."
-	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=discovery \
+	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=discovery $(KUBE_TEST_ENV) \
 		$(GO) test -tags=conformance -v -timeout $(TEST_TIMEOUT) ./...; \
 	TEST_EXIT=$$?; \
 	echo ""; \
@@ -141,12 +169,12 @@ conformance-test-discovery: install setup-credentials
 ## Used by CI matrix jobs where cleanup is managed separately.
 conformance-test-crud-run:
 	@echo "Running CRUD conformance tests..."
-	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=crud \
+	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=crud $(KUBE_TEST_ENV) \
 		$(GO) test -tags=conformance -v -timeout $(TEST_TIMEOUT) ./...
 
 ## conformance-test-discovery-run: Run only discovery tests (no cleanup)
 ## Used by CI matrix jobs where cleanup is managed separately.
 conformance-test-discovery-run:
 	@echo "Running discovery conformance tests..."
-	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=discovery \
+	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=discovery $(KUBE_TEST_ENV) \
 		$(GO) test -tags=conformance -v -timeout $(TEST_TIMEOUT) ./...

@@ -114,71 +114,77 @@ open class NodePool extends formae.Resource {
   flavorName: String
 
   /// Desired number of nodes
+  @ovh.FieldHint
   desiredNodes: Int?
 
   /// Minimum number of nodes (for autoscaling)
+  @ovh.FieldHint
   minNodes: Int?
 
   /// Maximum number of nodes (for autoscaling)
+  @ovh.FieldHint
   maxNodes: Int?
 
   /// Enable autoscaling
+  @ovh.FieldHint
   autoscale: Boolean?
 
   /// Autoscaling configuration
+  @ovh.FieldHint { hasProviderDefault = true }
   autoscaling: Autoscaling?
 
   /// Enable anti-affinity (spread nodes across hypervisors)
-  @ovh.FieldHint { createOnly = true }
+  @ovh.FieldHint { createOnly = true; hasProviderDefault = true }
   antiAffinity: Boolean?
 
   /// Enable monthly billing for nodes
-  @ovh.FieldHint { createOnly = true }
+  @ovh.FieldHint { createOnly = true; hasProviderDefault = true }
   monthlyBilled: Boolean?
 
   /// Availability zones (mandatory for multi-zone clusters)
-  @ovh.FieldHint { createOnly = true }
+  @ovh.FieldHint { createOnly = true; hasProviderDefault = true }
   availabilityZones: Listing<String>?
 
   /// Node template configuration
+  @ovh.FieldHint { hasProviderDefault = true }
   template: Template?
 
   // === Computed/Output fields ===
 
   /// Node pool ID
-  @ovh.FieldHint 
+  @ovh.FieldHint { hasProviderDefault = true }
   id: String?
 
   /// Flavor (full flavor name)
-  @ovh.FieldHint 
+  @ovh.FieldHint { hasProviderDefault = true }
   flavor: String?
 
   /// Node pool status
-  @ovh.FieldHint 
+  @ovh.FieldHint { hasProviderDefault = true }
   status: NodePoolStatus?
 
   /// Size status (capacity)
-  @ovh.FieldHint 
+  @ovh.FieldHint { hasProviderDefault = true }
   sizeStatus: SizeStatus?
 
   /// Current number of nodes
-  @ovh.FieldHint 
+  @ovh.FieldHint { hasProviderDefault = true }
   currentNodes: Int?
 
   /// Number of available/ready nodes
-  @ovh.FieldHint 
+  @ovh.FieldHint { hasProviderDefault = true }
   availableNodes: Int?
 
   /// Number of up-to-date nodes
-  @ovh.FieldHint 
+  @ovh.FieldHint { hasProviderDefault = true }
   upToDateNodes: Int?
 
   /// Creation timestamp
-  @ovh.FieldHint 
+  @ovh.FieldHint { hasProviderDefault = true }
   createdAt: String?
 
   /// Last update timestamp
-  @ovh.FieldHint 
+  @ovh.FieldHint { hasProviderDefault = true }
   updatedAt: String?
 
   hidden res: NodePoolResolvable = new {

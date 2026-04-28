@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/platform-engineering-labs/formae/pkg/plugin"
 	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 	"github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/prov"
 	"github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/registry"
@@ -19,8 +20,14 @@ import (
 const IpRestrictionResourceType = "OVH::Kube::IpRestriction"
 
 // ipRestrictionProvisioner handles Kubernetes IP restriction operations.
-// The OVH API uses a bulk PUT endpoint, so we read-modify-write.
-// Path: PUT /cloud/project/{project}/kube/{kubeId}/ipRestrictions
+//
+// OVH exposes a single collection endpoint:
+//
+//	GET  /cloud/project/{p}/kube/{k}/ipRestrictions  -> ipBlock[] (array of CIDR strings)
+//	POST /cloud/project/{p}/kube/{k}/ipRestrictions  body { ips: ipBlock[] } (append)
+//	PUT  /cloud/project/{p}/kube/{k}/ipRestrictions  body { ips: ipBlock[] } (replace)
+//
+// There is no DELETE endpoint; removing one IP requires PUT-ing the remainder.
 type ipRestrictionProvisioner struct {
 	client *ovhtransport.Client
 }
@@ -43,48 +50,26 @@ func (p *ipRestrictionProvisioner) Create(ctx context.Context, request *resource
 			"serviceName, kubeId, and ip are required"), nil
 	}
 
-	// Get current IP restrictions
-	currentIPs, err := p.getIPRestrictions(ctx, project, kubeID)
-	if err != nil {
-		return handleTransportError(err), nil
-	}
+	log := plugin.LoggerFromContext(ctx)
+	log.Debug("kube ipRestriction create request", "project", project, "kubeID", kubeID, "ip", ip)
 
-	// Check if IP already exists
-	for _, existing := range currentIPs {
-		if existingIP, _ := existing["ip"].(string); existingIP == ip {
-			// Already exists, return success with existing data
-			nativeID := fmt.Sprintf("%s/%s/%s", project, kubeID, ip)
-			propsJSON, _ := json.Marshal(existing)
-			return &resource.CreateResult{
-				ProgressResult: &resource.ProgressResult{
-					Operation:          resource.OperationCreate,
-					OperationStatus:    resource.OperationStatusSuccess,
-					NativeID:           nativeID,
-					ResourceProperties: propsJSON,
-				},
-			}, nil
+	url := fmt.Sprintf("/cloud/project/%s/kube/%s/ipRestrictions", project, kubeID)
+	body := map[string]interface{}{"ips": []string{ip}}
+
+	if _, err := p.client.Do(ctx, ovhtransport.RequestOptions{
+		Method: "POST",
+		Path:   url,
+		Body:   body,
+	}); err != nil {
+		log.Debug("kube ipRestriction create error", "err", err)
+		if transportErr, ok := err.(*ovhtransport.Error); ok {
+			return createFailure(ovhtransport.ToResourceErrorCode(transportErr.Code), transportErr.Message), nil
 		}
+		return createFailure(resource.OperationErrorCodeServiceInternalError, err.Error()), nil
 	}
 
-	// Add new IP restriction
-	newRestriction := map[string]interface{}{
-		"ip": ip,
-	}
-	if desc, ok := props["description"].(string); ok && desc != "" {
-		newRestriction["description"] = desc
-	}
-
-	currentIPs = append(currentIPs, newRestriction)
-
-	// Put the updated list
-	if err := p.putIPRestrictions(ctx, project, kubeID, currentIPs); err != nil {
-		return handleTransportError(err), nil
-	}
-
-	// Native ID: project/kubeId/ip
 	nativeID := fmt.Sprintf("%s/%s/%s", project, kubeID, ip)
-
-	propsJSON, _ := json.Marshal(newRestriction)
+	propsJSON, _ := json.Marshal(map[string]interface{}{"ip": ip})
 
 	return &resource.CreateResult{
 		ProgressResult: &resource.ProgressResult{
@@ -102,7 +87,7 @@ func (p *ipRestrictionProvisioner) Read(ctx context.Context, request *resource.R
 		return &resource.ReadResult{ErrorCode: resource.OperationErrorCodeInvalidRequest}, nil
 	}
 
-	currentIPs, err := p.getIPRestrictions(ctx, project, kubeID)
+	currentIPs, err := p.listIPRestrictions(ctx, project, kubeID)
 	if err != nil {
 		if transportErr, ok := err.(*ovhtransport.Error); ok {
 			return &resource.ReadResult{
@@ -112,86 +97,14 @@ func (p *ipRestrictionProvisioner) Read(ctx context.Context, request *resource.R
 		return &resource.ReadResult{ErrorCode: resource.OperationErrorCodeServiceInternalError}, nil
 	}
 
-	// Find the specific IP
 	for _, existing := range currentIPs {
-		if existingIP, _ := existing["ip"].(string); existingIP == ip {
-			propsJSON, _ := json.Marshal(existing)
+		if existing == ip {
+			propsJSON, _ := json.Marshal(map[string]interface{}{"ip": ip})
 			return &resource.ReadResult{Properties: string(propsJSON)}, nil
 		}
 	}
 
 	return &resource.ReadResult{ErrorCode: resource.OperationErrorCodeNotFound}, nil
-}
-
-func (p *ipRestrictionProvisioner) Update(ctx context.Context, request *resource.UpdateRequest) (*resource.UpdateResult, error) {
-	var props map[string]interface{}
-	if err := json.Unmarshal(request.DesiredProperties, &props); err != nil {
-		return updateFailure(request.NativeID, resource.OperationErrorCodeInvalidRequest,
-			fmt.Sprintf("failed to parse properties: %v", err)), nil
-	}
-
-	project, kubeID, ip, err := parseNestedNativeID(request.NativeID)
-	if err != nil {
-		return updateFailure(request.NativeID, resource.OperationErrorCodeInvalidRequest, err.Error()), nil
-	}
-
-	currentIPs, err := p.getIPRestrictions(ctx, project, kubeID)
-	if err != nil {
-		if transportErr, ok := err.(*ovhtransport.Error); ok {
-			return updateFailure(request.NativeID, ovhtransport.ToResourceErrorCode(transportErr.Code),
-				transportErr.Message), nil
-		}
-		return updateFailure(request.NativeID, resource.OperationErrorCodeServiceInternalError, err.Error()), nil
-	}
-
-	// Find and update the specific IP
-	found := false
-	for i, existing := range currentIPs {
-		if existingIP, _ := existing["ip"].(string); existingIP == ip {
-			// Update description if provided
-			if desc, ok := props["description"].(string); ok {
-				currentIPs[i]["description"] = desc
-			}
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		return updateFailure(request.NativeID, resource.OperationErrorCodeNotFound, "IP restriction not found"), nil
-	}
-
-	// Put the updated list
-	if err := p.putIPRestrictions(ctx, project, kubeID, currentIPs); err != nil {
-		if transportErr, ok := err.(*ovhtransport.Error); ok {
-			return updateFailure(request.NativeID, ovhtransport.ToResourceErrorCode(transportErr.Code),
-				transportErr.Message), nil
-		}
-		return updateFailure(request.NativeID, resource.OperationErrorCodeServiceInternalError, err.Error()), nil
-	}
-
-	// Return updated properties
-	for _, existing := range currentIPs {
-		if existingIP, _ := existing["ip"].(string); existingIP == ip {
-			propsJSON, _ := json.Marshal(existing)
-			return &resource.UpdateResult{
-				ProgressResult: &resource.ProgressResult{
-					Operation:          resource.OperationUpdate,
-					OperationStatus:    resource.OperationStatusSuccess,
-					NativeID:           request.NativeID,
-					ResourceProperties: propsJSON,
-				},
-			}, nil
-		}
-	}
-
-	return &resource.UpdateResult{
-		ProgressResult: &resource.ProgressResult{
-			Operation:       resource.OperationUpdate,
-			OperationStatus: resource.OperationStatusSuccess,
-			NativeID:        request.NativeID,
-		},
-	}, nil
 }
 
 func (p *ipRestrictionProvisioner) Delete(ctx context.Context, request *resource.DeleteRequest) (*resource.DeleteResult, error) {
@@ -200,7 +113,9 @@ func (p *ipRestrictionProvisioner) Delete(ctx context.Context, request *resource
 		return deleteFailure(request.NativeID, resource.OperationErrorCodeInvalidRequest, err.Error()), nil
 	}
 
-	currentIPs, err := p.getIPRestrictions(ctx, project, kubeID)
+	log := plugin.LoggerFromContext(ctx)
+
+	currentIPs, err := p.listIPRestrictions(ctx, project, kubeID)
 	if err != nil {
 		if transportErr, ok := err.(*ovhtransport.Error); ok {
 			if transportErr.Code == ovhtransport.ErrorCodeResourceNotFound {
@@ -218,16 +133,23 @@ func (p *ipRestrictionProvisioner) Delete(ctx context.Context, request *resource
 		return deleteFailure(request.NativeID, resource.OperationErrorCodeServiceInternalError, err.Error()), nil
 	}
 
-	// Remove the specific IP
-	var newIPs []map[string]interface{}
+	remaining := make([]string, 0, len(currentIPs))
 	for _, existing := range currentIPs {
-		if existingIP, _ := existing["ip"].(string); existingIP != ip {
-			newIPs = append(newIPs, existing)
+		if existing != ip {
+			remaining = append(remaining, existing)
 		}
 	}
 
-	// Put the updated list
-	if err := p.putIPRestrictions(ctx, project, kubeID, newIPs); err != nil {
+	url := fmt.Sprintf("/cloud/project/%s/kube/%s/ipRestrictions", project, kubeID)
+	body := map[string]interface{}{"ips": remaining}
+
+	log.Debug("kube ipRestriction replace (delete)", "remaining", remaining)
+	if _, err := p.client.Do(ctx, ovhtransport.RequestOptions{
+		Method: "PUT",
+		Path:   url,
+		Body:   body,
+	}); err != nil {
+		log.Debug("kube ipRestriction replace error", "err", err)
 		if transportErr, ok := err.(*ovhtransport.Error); ok {
 			return deleteFailure(request.NativeID, ovhtransport.ToResourceErrorCode(transportErr.Code),
 				transportErr.Message), nil
@@ -252,22 +174,23 @@ func (p *ipRestrictionProvisioner) List(ctx context.Context, request *resource.L
 		return &resource.ListResult{NativeIDs: nil}, nil
 	}
 
-	currentIPs, err := p.getIPRestrictions(ctx, project, kubeID)
+	currentIPs, err := p.listIPRestrictions(ctx, project, kubeID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list IP restrictions: %w", err)
 	}
 
-	var nativeIDs []string
-	for _, item := range currentIPs {
-		if ip, ok := item["ip"].(string); ok {
-			nativeIDs = append(nativeIDs, fmt.Sprintf("%s/%s/%s", project, kubeID, ip))
-		}
+	nativeIDs := make([]string, 0, len(currentIPs))
+	for _, ip := range currentIPs {
+		nativeIDs = append(nativeIDs, fmt.Sprintf("%s/%s/%s", project, kubeID, ip))
 	}
 
 	return &resource.ListResult{NativeIDs: nativeIDs}, nil
 }
 
-func (p *ipRestrictionProvisioner) Status(ctx context.Context, request *resource.StatusRequest) (*resource.StatusResult, error) {
+// Status is unused — IP restrictions are synchronous, so Create/Delete return
+// Success directly and the operation list below does not register OperationCheckStatus.
+// The method exists only to satisfy the prov.Provisioner interface.
+func (p *ipRestrictionProvisioner) Status(_ context.Context, request *resource.StatusRequest) (*resource.StatusResult, error) {
 	return &resource.StatusResult{
 		ProgressResult: &resource.ProgressResult{
 			Operation:       resource.OperationCheckStatus,
@@ -278,8 +201,17 @@ func (p *ipRestrictionProvisioner) Status(ctx context.Context, request *resource
 	}, nil
 }
 
-// getIPRestrictions fetches current IP restrictions for a cluster
-func (p *ipRestrictionProvisioner) getIPRestrictions(ctx context.Context, project, kubeID string) ([]map[string]interface{}, error) {
+// Update is unused — IP restrictions have no mutable fields. The method exists
+// only to satisfy the prov.Provisioner interface; OperationUpdate is not
+// registered below, so this should never be invoked.
+func (p *ipRestrictionProvisioner) Update(_ context.Context, request *resource.UpdateRequest) (*resource.UpdateResult, error) {
+	return updateFailure(request.NativeID, resource.OperationErrorCodeInvalidRequest,
+		"IpRestriction has no mutable fields"), nil
+}
+
+// listIPRestrictions fetches current IP restrictions for a cluster. The OVH API
+// returns a JSON array of CIDR strings (`ipBlock[]`).
+func (p *ipRestrictionProvisioner) listIPRestrictions(ctx context.Context, project, kubeID string) ([]string, error) {
 	url := fmt.Sprintf("/cloud/project/%s/kube/%s/ipRestrictions", project, kubeID)
 
 	response, err := p.client.Do(ctx, ovhtransport.RequestOptions{
@@ -290,33 +222,13 @@ func (p *ipRestrictionProvisioner) getIPRestrictions(ctx context.Context, projec
 		return nil, err
 	}
 
-	var result []map[string]interface{}
+	result := make([]string, 0, len(response.BodyArray))
 	for _, item := range response.BodyArray {
-		if m, ok := item.(map[string]interface{}); ok {
-			result = append(result, m)
+		if s, ok := item.(string); ok {
+			result = append(result, s)
 		}
 	}
-
 	return result, nil
-}
-
-// putIPRestrictions updates IP restrictions for a cluster
-func (p *ipRestrictionProvisioner) putIPRestrictions(ctx context.Context, project, kubeID string, ips []map[string]interface{}) error {
-	url := fmt.Sprintf("/cloud/project/%s/kube/%s/ipRestrictions", project, kubeID)
-
-	// Convert to interface{} slice for the API (transport Body accepts interface{})
-	body := make([]interface{}, len(ips))
-	for i, ip := range ips {
-		body[i] = ip
-	}
-
-	_, err := p.client.Do(ctx, ovhtransport.RequestOptions{
-		Method: "PUT",
-		Path:   url,
-		Body:   body,
-	})
-
-	return err
 }
 
 func init() {
@@ -325,7 +237,6 @@ func init() {
 		[]resource.Operation{
 			resource.OperationCreate,
 			resource.OperationRead,
-			resource.OperationUpdate,
 			resource.OperationDelete,
 			resource.OperationList,
 		},
