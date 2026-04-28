@@ -117,7 +117,7 @@ TEST_TIMEOUT := $(if $(TIMEOUT),$(if $(shell echo $(TIMEOUT) | grep -E '^[0-9]+$
 # OOB_DELETE_TIMEOUT: bounds the post-sync inventory tombstone wait. The plugin
 # Delete has already returned by this point; what we wait for here is OVH's GET
 # eventually reflecting the deletion — for kube clusters that is 5-10 min.
-FORMAE_TIMEOUT ?= 15
+FORMAE_TIMEOUT ?= 50
 OOB_TIMEOUT ?= 15
 OOB_DELETE_TIMEOUT ?= 30
 KUBE_TEST_ENV := FORMAE_TEST_TIMEOUT=$(FORMAE_TIMEOUT) \
