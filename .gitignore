@@ -27,6 +27,7 @@ dist/
 # Pkl
 .pkl-cache/
 *.pkl-expected.pcf
+schema/pkl/VERSION
 .env
 .env.*
 .github-secrets*
