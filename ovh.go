@@ -41,7 +41,6 @@ var _ plugin.ResourcePlugin = &Plugin{}
 
 // RateLimit returns the rate limit configuration for this plugin
 func (p *Plugin) RateLimit() model.RateLimitConfig {
-	pluginStartupLog("Plugin.RateLimit called")
 	return model.RateLimitConfig{
 		Scope:                            model.RateLimitScopeNamespace,
 		MaxRequestsPerSecondForNamespace: 2, // Conservative rate limit for APIs
@@ -51,14 +50,12 @@ func (p *Plugin) RateLimit() model.RateLimitConfig {
 // DiscoveryFilters returns declarative filters for discovery.
 // OVH doesn't need any special filters currently.
 func (p *Plugin) DiscoveryFilters() []model.MatchFilter {
-	pluginStartupLog("Plugin.DiscoveryFilters called")
 	return nil
 }
 
 // LabelConfig returns the label extraction configuration for discovered OVH resources.
 // Most resources have a "name" property, with FloatingIP being the exception.
 func (p *Plugin) LabelConfig() model.LabelConfig {
-	pluginStartupLog("Plugin.LabelConfig called")
 	return model.LabelConfig{
 		DefaultQuery: "$.name",
 		ResourceOverrides: map[string]string{
