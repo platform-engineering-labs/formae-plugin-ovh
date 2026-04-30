@@ -1,0 +1,58 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@ovh/compute/instance.pkl"
+import "@ovh/network/privatenetwork.pkl"
+import "@ovh/network/privatesubnet.pkl"
+
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  // Private network for the instance
+  // Use vlanId 100 to avoid conflicts with other tests
+  local testNetwork = new privatenetwork.PrivateNetwork {
+    label = "plugin-sdk-test-instance-network"
+    name = "formae-plugin-sdk-test-instance-net-\(v.testRunID)"
+    regions {
+      v.region
+    }
+    vlanId = 100
+  }
+  testNetwork
+
+  // Subnet must exist on the network before any instance can boot on it.
+  local testSubnet = new privatesubnet.PrivateSubnet {
+    label = "plugin-sdk-test-instance-subnet"
+    region = v.region
+    networkId = testNetwork.res.id
+    network = "10.0.1.0/24"
+    dhcp = true
+    noGateway = false
+    start = "10.0.1.2"
+    end = "10.0.1.254"
+  }
+  testSubnet
+
+  new instance.Instance {
+    label = "plugin-sdk-test-instance"
+    name = "formae-plugin-sdk-test-\(v.testRunID)"
+    flavorId = v.flavorID
+    region = v.region
+    imageId = v.ubuntuImageID
+    networks {
+      new instance.NetworkParams {
+        // Reference subnet's networkId (not network.res.id) so the dependency
+        // graph forces subnet creation before instance boot.
+        networkId = testSubnet.res.networkId
+      }
+    }
+  }
+}

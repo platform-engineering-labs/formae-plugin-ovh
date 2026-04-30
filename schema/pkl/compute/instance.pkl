@@ -86,6 +86,7 @@ open class Instance extends formae.Resource {
   /// SSH keypair id
   @ovh.FieldHint {
     createOnly = true
+    hasProviderDefault = true
   }
   sshKeyId: String?
 
@@ -98,6 +99,7 @@ open class Instance extends formae.Resource {
   /// Availability zone to create the instance on
   @ovh.FieldHint {
     createOnly = true
+    hasProviderDefault = true
   }
   availabilityZone: String?
 
@@ -110,6 +112,7 @@ open class Instance extends formae.Resource {
   /// Activate monthly billing
   @ovh.FieldHint {
     createOnly = true
+    hasProviderDefault = true
   }
   monthlyBilling: Boolean?
 
@@ -155,7 +158,13 @@ open class NetworkParams extends formae.SubResource {
   /// Private or public network ID
   networkId: (String|formae.Resolvable)?
 
-  /// Static IP address (can only be defined for private networks)
+  /// Static IP address (can only be defined for private networks).
+  /// OVH allocates one via DHCP if unspecified, so the response always
+  /// carries an IP — mark it as provider-defaulted to avoid spurious
+  /// conformance "unexpected property" errors.
+  @ovh.FieldHint {
+    hasProviderDefault = true
+  }
   ip: String?
 }
 

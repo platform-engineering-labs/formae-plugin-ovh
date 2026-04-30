@@ -62,4 +62,17 @@ type ResourceConfig struct {
 	// deleted. When Read encounters one of these in the "status" response field,
 	// it returns NotFound so formae's sync correctly tombstones the resource.
 	DeletingStatuses []string
+
+	// AsyncDelete makes Delete return OperationStatusInProgress instead of
+	// Success once the provider has accepted the DELETE call. Formae then
+	// polls Status() until the resource returns 404 (deletion complete).
+	// Use this when downstream resources share state with the deleted
+	// resource — e.g. an OVH instance keeps a port allocated on its subnet
+	// for several seconds after DELETE returns 200; without async-delete,
+	// formae fires sibling Deletes (subnet, network) too soon and the
+	// provider rejects them with "ports have an IP allocation from this
+	// subnet". Async-delete is preferred over a synchronous wait because
+	// formae owns the polling cadence and the plugin avoids hard-coded
+	// timeouts.
+	AsyncDelete bool
 }
