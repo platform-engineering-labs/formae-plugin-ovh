@@ -22,7 +22,7 @@ open class PrivateSubnetResolvable extends formae.Resolvable {
   }
 
   /// The subnet's network ID
-  hidden network_id: PrivateSubnetResolvable = (this) {
+  hidden networkId: PrivateSubnetResolvable = (this) {
     property = "network_id"
   }
 }
@@ -48,8 +48,9 @@ open class PrivateSubnet extends formae.Resource {
   @ovh.FieldHint {
     required = true
     createOnly = true
+    outputField="network_id"
   }
-  network_id: String|formae.Resolvable
+  networkId: String|formae.Resolvable
 
   /// Global network with CIDR notation (e.g., "192.168.1.0/24").
   @ovh.FieldHint {
