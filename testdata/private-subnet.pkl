@@ -24,7 +24,7 @@ forma {
     regions {
       v.region
     }
-    vlanId = 200
+    vlanId = 30
   }
   testNetwork
 
@@ -32,11 +32,11 @@ forma {
   new privatesubnet.PrivateSubnet {
     label = "plugin-sdk-test-subnet"
     region = v.region
-    network_id = testNetwork.res.id
-    network = "10.0.6.0/24"
+    networkId = testNetwork.res.id
+    network = "10.30.6.0/24"
     dhcp = true
     noGateway = false
-    start = "10.0.6.2"
-    end = "10.0.6.254"
+    start = "10.30.6.2"
+    end = "10.30.6.254"
   }
 }

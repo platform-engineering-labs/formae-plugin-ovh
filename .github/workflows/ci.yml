@@ -109,10 +109,10 @@ jobs:
       - name: Clean test resources
         run: make conformance-cleanup
 
-  # Conformance tests run the full CRUD lifecycle against real OVH resources.
+  # CRUD conformance tests run the full lifecycle against real OVH resources.
   # Each test case runs in its own isolated job via matrix strategy.
-  # Cleanup is handled by separate pre/post-cleanup jobs, NOT per test.
-  conformance-tests:
+  # Cleanup is handled by separate pre/mid/post-cleanup jobs, NOT per test.
+  conformance-crud-tests:
     needs: [discover-tests, pre-cleanup]
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -158,17 +158,102 @@ jobs:
       - name: Install plugin
         run: make install
 
-      - name: Run conformance test (${{ matrix.test-case }})
+      - name: Run CRUD conformance test (${{ matrix.test-case }})
         env:
           FORMAE_TEST_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
           POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+        run: make conformance-test-crud-run TEST=${{ matrix.test-case }}
+
+  # Clean up between CRUD matrix and Discovery matrix so the discovery phase
+  # starts from a known-empty environment. Always runs even if CRUD failed,
+  # so leftover CRUD resources do not poison Discovery.
+  mid-cleanup:
+    needs: [conformance-crud-tests]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure credentials
         run: |
-          make conformance-test-crud-run TEST=${{ matrix.test-case }}
-          make conformance-test-discovery-run TEST=${{ matrix.test-case }}
+          echo "OVH_ENDPOINT=${{ secrets.OVH_ENDPOINT }}" >> $GITHUB_ENV
+          echo "OVH_APPLICATION_KEY=${{ secrets.OVH_APPLICATION_KEY }}" >> $GITHUB_ENV
+          echo "OVH_APPLICATION_SECRET=${{ secrets.OVH_APPLICATION_SECRET }}" >> $GITHUB_ENV
+          echo "OVH_CONSUMER_KEY=${{ secrets.OVH_CONSUMER_KEY }}" >> $GITHUB_ENV
+          echo "OVH_CLOUD_PROJECT_ID=${{ secrets.OVH_CLOUD_PROJECT_ID }}" >> $GITHUB_ENV
+          echo "OS_AUTH_URL=${{ secrets.OS_AUTH_URL }}" >> $GITHUB_ENV
+          echo "OS_USERNAME=${{ secrets.OS_USERNAME }}" >> $GITHUB_ENV
+          echo "OS_PASSWORD=${{ secrets.OS_PASSWORD }}" >> $GITHUB_ENV
+          echo "OS_PROJECT_ID=${{ secrets.OS_PROJECT_ID }}" >> $GITHUB_ENV
+          echo "OS_REGION_NAME=${{ secrets.OS_REGION_NAME }}" >> $GITHUB_ENV
+          echo "OS_USER_DOMAIN_NAME=${{ secrets.OS_USER_DOMAIN_NAME }}" >> $GITHUB_ENV
+          echo "OS_PROJECT_DOMAIN_NAME=${{ secrets.OS_PROJECT_DOMAIN_NAME }}" >> $GITHUB_ENV
+          echo "OS_IDENTITY_API_VERSION=3" >> $GITHUB_ENV
+
+      - name: Install OpenStack CLI
+        run: pip install python-openstackclient
+
+      - name: Clean test resources
+        run: make conformance-cleanup
+
+  # Discovery conformance tests run after CRUD + cleanup so each discovery
+  # test case sees a deterministic, freshly-cleaned environment.
+  conformance-discovery-tests:
+    needs: [discover-tests, mid-cleanup]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        test-case: ${{ fromJson(needs.discover-tests.outputs.test-cases) }}
+      max-parallel: 10
+      fail-fast: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Set up Pkl
+        uses: pkl-community/setup-pkl@v0
+        with:
+          pkl-version: 0.30.0
+
+      - name: Configure credentials
+        run: |
+          echo "OVH_ENDPOINT=${{ secrets.OVH_ENDPOINT }}" >> $GITHUB_ENV
+          echo "OVH_APPLICATION_KEY=${{ secrets.OVH_APPLICATION_KEY }}" >> $GITHUB_ENV
+          echo "OVH_APPLICATION_SECRET=${{ secrets.OVH_APPLICATION_SECRET }}" >> $GITHUB_ENV
+          echo "OVH_CONSUMER_KEY=${{ secrets.OVH_CONSUMER_KEY }}" >> $GITHUB_ENV
+          echo "OVH_CLOUD_PROJECT_ID=${{ secrets.OVH_CLOUD_PROJECT_ID }}" >> $GITHUB_ENV
+          echo "OS_AUTH_URL=${{ secrets.OS_AUTH_URL }}" >> $GITHUB_ENV
+          echo "OS_USERNAME=${{ secrets.OS_USERNAME }}" >> $GITHUB_ENV
+          echo "OS_PASSWORD=${{ secrets.OS_PASSWORD }}" >> $GITHUB_ENV
+          echo "OS_PROJECT_ID=${{ secrets.OS_PROJECT_ID }}" >> $GITHUB_ENV
+          echo "OS_REGION_NAME=${{ secrets.OS_REGION_NAME }}" >> $GITHUB_ENV
+          echo "OS_USER_DOMAIN_NAME=${{ secrets.OS_USER_DOMAIN_NAME }}" >> $GITHUB_ENV
+          echo "OS_PROJECT_DOMAIN_NAME=${{ secrets.OS_PROJECT_DOMAIN_NAME }}" >> $GITHUB_ENV
+          echo "OS_IDENTITY_API_VERSION=3" >> $GITHUB_ENV
+
+      - name: Install OpenStack CLI
+        run: pip install python-openstackclient
+
+      - name: Install plugin
+        run: make install
+
+      - name: Run Discovery conformance test (${{ matrix.test-case }})
+        env:
+          FORMAE_TEST_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+        run: make conformance-test-discovery-run TEST=${{ matrix.test-case }}
 
   # Clean up test resources after all conformance tests (always runs)
   post-cleanup:
-    needs: [conformance-tests]
+    needs: [conformance-discovery-tests]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -199,7 +284,7 @@ jobs:
 
   # Notify when build is fixed (was red, now green)
   notify-fixed:
-    needs: [checks, conformance-tests, post-cleanup]
+    needs: [checks, conformance-crud-tests, conformance-discovery-tests, post-cleanup]
     runs-on: ubuntu-latest
     if: success() && github.event_name == 'push'
     steps:
@@ -261,7 +346,7 @@ jobs:
 
   # Notify on failure
   notify-failure:
-    needs: [checks, conformance-tests, post-cleanup]
+    needs: [checks, conformance-crud-tests, conformance-discovery-tests, post-cleanup]
     runs-on: ubuntu-latest
     if: failure() && github.event_name == 'push'
     steps:

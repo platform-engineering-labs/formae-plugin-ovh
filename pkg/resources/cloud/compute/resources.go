@@ -19,15 +19,22 @@ const (
 
 var cloudComputeRegistry *base.ResourceRegistry
 
-// instanceStatusChecker verifies the instance has reached ACTIVE status.
+// instanceStatusChecker verifies the instance has reached ACTIVE status AND
+// has at least one IP attached. OVH reports ACTIVE before DHCP allocation
+// finishes, so polling Read at that point yields ipAddresses=[] and the
+// derived `networks` field is empty. Waiting for ipAddresses to populate
+// ensures the persisted `networks` matches the spec at the verify step.
+//
 // OVH instances go through BUILD -> ACTIVE (or ERROR) states.
 func instanceStatusChecker(resourceData map[string]interface{}) (bool, error) {
 	status, ok := resourceData["status"].(string)
-	if !ok {
-		// No status field - consider not ready
+	if !ok || status != "ACTIVE" {
 		return false, nil
 	}
-	return status == "ACTIVE", nil
+	if addrs, present := resourceData["ipAddresses"].([]interface{}); present && len(addrs) == 0 {
+		return false, nil
+	}
+	return true, nil
 }
 
 // volumeStatusChecker verifies the volume has reached "available" status.
@@ -55,13 +62,15 @@ func init() {
 		{
 			ResourceType: InstanceResourceType,
 			ResourceConfig: base.ResourceConfig{
-				ResourceType:   "instance",
-				Scope:          &base.ScopeConfig{Type: base.ScopeProject},
-				SupportsUpdate: true,
-				UpdateMethod:   base.UpdateMethodPut,
+				ResourceType:     "instance",
+				Scope:            &base.ScopeConfig{Type: base.ScopeProject},
+				SupportsUpdate:   true,
+				UpdateMethod:     base.UpdateMethodPut,
+				AsyncDelete:      true,
+				DeletingStatuses: []string{"DELETED", "DELETING"},
 			},
-			//ResponseTransformer: instanceTransformer,
-			StatusChecker: instanceStatusChecker,
+			ResponseTransformer: instanceTransformer,
+			StatusChecker:       instanceStatusChecker,
 			Operations: []resource.Operation{
 				resource.OperationCreate,
 				resource.OperationRead,
