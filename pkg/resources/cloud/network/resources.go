@@ -20,9 +20,10 @@ const (
 	PrivateNetworkResourceType = "OVH::Network::PrivateNetwork"
 	//SubnetResourceType         = "OVH::Network::Subnet"
 	PrivateSubnetResourceType = "OVH::Network::PrivateSubnet"
-	FloatingIPResourceType    = "OVH::Network::FloatingIP"
-	SecurityGroupResourceType = "OVH::Network::SecurityGroup"
-	GatewayResourceType       = "OVH::Network::Gateway"
+	FloatingIPResourceType = "OVH::Network::FloatingIP"
+	// SecurityGroup ("OVH::Network::SecurityGroup") is registered via the
+	// OpenStack transport — see pkg/resources/openstack/resources/network/securitygroup.go.
+	GatewayResourceType = "OVH::Network::Gateway"
 )
 
 var cloudNetworkRegistry *base.ResourceRegistry
@@ -159,22 +160,12 @@ func init() {
 		// - Delete: DELETE /cloud/project/{serviceName}/region/{regionName}/floatingip/{floatingIpId}
 		// - List:   GET /cloud/project/{serviceName}/region/{regionName}/floatingip
 
-		// Security Group
-		{
-			ResourceType: SecurityGroupResourceType,
-			ResourceConfig: base.ResourceConfig{
-				ResourceType:   "instance/group",
-				Scope:          &base.ScopeConfig{Type: base.ScopeProject},
-				SupportsUpdate: true,
-			},
-			Operations: []resource.Operation{
-				resource.OperationCreate,
-				resource.OperationRead,
-				resource.OperationUpdate,
-				resource.OperationDelete,
-				resource.OperationList,
-			},
-		},
+		// NOTE: SecurityGroup is registered via the OpenStack transport in
+		// pkg/resources/openstack/resources/network/securitygroup.go. The OVH
+		// REST endpoint /cloud/project/{serviceName}/instance/group is a
+		// legacy non-regional path that returns HTTP 500 for newer projects;
+		// the Neutron path is the supported one.
+		//
 		// NOTE: Gateway is registered separately in gateway.go with custom path builder
 		// because Create path differs from Read/Delete/List path:
 		// - Create: POST /cloud/project/{serviceName}/region/{regionName}/network/{networkId}/subnet/{subnetId}/gateway
