@@ -106,6 +106,13 @@ func (p *clusterProvisioner) Read(ctx context.Context, request *resource.ReadReq
 		return &resource.ReadResult{ErrorCode: resource.OperationErrorCodeServiceInternalError}, nil
 	}
 
+	// serviceName is a URL parameter, not part of the OVH API body. Inject it
+	// from the native ID so the discovered resource passes formae's required-
+	// field validation (cluster.pkl declares serviceName required).
+	if response.Body != nil {
+		response.Body["serviceName"] = project
+	}
+
 	propsJSON, _ := json.Marshal(response.Body)
 	return &resource.ReadResult{Properties: string(propsJSON)}, nil
 }
@@ -269,6 +276,12 @@ func (p *clusterProvisioner) Status(ctx context.Context, request *resource.Statu
 				NativeID:        request.NativeID,
 			},
 		}, nil
+	}
+
+	// Inject serviceName so it's present in ResourceProperties — required field
+	// in the schema, not returned by the OVH API body.
+	if response.Body != nil {
+		response.Body["serviceName"] = project
 	}
 
 	propsJSON, _ := json.Marshal(response.Body)
