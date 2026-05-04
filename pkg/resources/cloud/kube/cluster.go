@@ -193,7 +193,7 @@ func (p *clusterProvisioner) Delete(ctx context.Context, request *resource.Delet
 	return &resource.DeleteResult{
 		ProgressResult: &resource.ProgressResult{
 			Operation:       resource.OperationDelete,
-			OperationStatus: resource.OperationStatusSuccess,
+			OperationStatus: resource.OperationStatusInProgress,
 			NativeID:        request.NativeID,
 		},
 	}, nil
@@ -239,6 +239,18 @@ func (p *clusterProvisioner) Status(ctx context.Context, request *resource.Statu
 	})
 	if err != nil {
 		if transportErr, ok := err.(*ovhtransport.Error); ok {
+			// 404 = resource gone. Success for Delete polling; harmless for
+			// Create polling since OVH never 404s a cluster mid-create.
+			if transportErr.Code == ovhtransport.ErrorCodeResourceNotFound {
+				return &resource.StatusResult{
+					ProgressResult: &resource.ProgressResult{
+						Operation:       resource.OperationCheckStatus,
+						OperationStatus: resource.OperationStatusSuccess,
+						RequestID:       request.RequestID,
+						NativeID:        request.NativeID,
+					},
+				}, nil
+			}
 			return statusFailure(request, ovhtransport.ToResourceErrorCode(transportErr.Code),
 				transportErr.Message), nil
 		}
