@@ -4,19 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sync"
 	"time"
 
 	ovhtransport "github.com/platform-engineering-labs/formae-plugin-ovh/pkg/transport/ovh"
 	"github.com/platform-engineering-labs/formae/pkg/plugin"
 	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
-
-// pendingDeletes tracks resources whose Delete returned InProgress so that
-// the next Status() call can use delete-polling semantics (404 = Success)
-// instead of the create-completion StatusChecker. The set survives across
-// CreateProvisioner invocations within one plugin process.
-var pendingDeletes sync.Map // map[NativeID]struct{}
 
 // TransportClient interface for API calls
 type TransportClient interface {
@@ -479,12 +472,10 @@ func (b *BaseResource) Delete(ctx context.Context, request *resource.DeleteReque
 	}
 
 	// AsyncDelete: provider accepted the DELETE call but the resource is not
-	// yet fully torn down (OVH instance keeps its subnet port for a few
-	// seconds, etc.). Return InProgress so formae polls Status until the
-	// resource returns 404, which serializes sibling Deletes that depend on
-	// the resource being truly gone.
+	// yet fully torn down. Return InProgress so formae polls Status until the
+	// resource returns 404 or enters a deleting status, which serializes
+	// sibling Deletes that depend on the resource being truly gone.
 	if b.ResourceConfig.AsyncDelete {
-		pendingDeletes.Store(request.NativeID, struct{}{})
 		log.Debug("base resource Delete returning InProgress (async)",
 			"resourceType", b.ResourceConfig.ResourceType, "url", url)
 		return &resource.DeleteResult{
@@ -492,7 +483,6 @@ func (b *BaseResource) Delete(ctx context.Context, request *resource.DeleteReque
 				Operation:       resource.OperationDelete,
 				OperationStatus: resource.OperationStatusInProgress,
 				NativeID:        request.NativeID,
-				StatusMessage:   "Delete accepted; waiting for resource to be fully removed",
 			},
 		}, nil
 	}
@@ -557,15 +547,14 @@ func (b *BaseResource) List(ctx context.Context, request *resource.ListRequest) 
 // Status checks operation status
 func (b *BaseResource) Status(ctx context.Context, request *resource.StatusRequest) (*resource.StatusResult, error) {
 	log := plugin.LoggerFromContext(ctx)
-	_, awaitingDelete := pendingDeletes.Load(request.NativeID)
 	log.Debug("base resource Status begin",
 		"resourceType", b.ResourceConfig.ResourceType,
 		"nativeID", request.NativeID,
 		"hasStatusChecker", b.StatusChecker != nil,
-		"awaitingDelete", awaitingDelete)
-	// If no StatusChecker is configured and we are not polling a pending
-	// delete, the resource is immediately ready.
-	if b.StatusChecker == nil && !awaitingDelete {
+		"asyncDelete", b.ResourceConfig.AsyncDelete)
+	// If neither create-completion polling (StatusChecker) nor async-delete
+	// polling is configured, the operation is already complete.
+	if b.StatusChecker == nil && !b.ResourceConfig.AsyncDelete {
 		return &resource.StatusResult{
 			ProgressResult: &resource.ProgressResult{
 				Operation:       resource.OperationCheckStatus,
@@ -638,16 +627,14 @@ func (b *BaseResource) Status(ctx context.Context, request *resource.StatusReque
 		log.Debug("base resource Status GET failed",
 			"resourceType", b.ResourceConfig.ResourceType, "url", url, "error", err.Error())
 		if transportErr, ok := err.(*ovhtransport.Error); ok {
-			// 404 while awaiting an async delete = deletion completed. Clear
-			// the pending marker and report Success so the resource updater
-			// finishes the delete operation.
-			if transportErr.Code == ovhtransport.ErrorCodeResourceNotFound && awaitingDelete {
-				pendingDeletes.Delete(request.NativeID)
-				log.Debug("base resource Status 404 → delete complete",
+			// 404 = resource gone. Success for delete polling; Create polling
+			// would never see this on OVH (resource appears immediately).
+			if transportErr.Code == ovhtransport.ErrorCodeResourceNotFound {
+				log.Debug("base resource Status 404 → operation complete",
 					"resourceType", b.ResourceConfig.ResourceType, "url", url)
 				return &resource.StatusResult{
 					ProgressResult: &resource.ProgressResult{
-						Operation:       resource.OperationDelete,
+						Operation:       resource.OperationCheckStatus,
 						OperationStatus: resource.OperationStatusSuccess,
 						RequestID:       request.RequestID,
 						NativeID:        request.NativeID,
@@ -683,41 +670,40 @@ func (b *BaseResource) Status(ctx context.Context, request *resource.StatusReque
 		"responseKeys", mapKeys(response.Body),
 		"status", response.Body["status"])
 
-	// Polling a pending async delete. OVH does not always return 404 for
-	// deleted resources — instances, for example, surface
-	// {status:"DELETED"} on GET for a while before the row is reaped. Treat
-	// any status in DeletingStatuses as "gone enough" and report Success;
-	// otherwise the resource is still tearing down and we stay InProgress.
-	if awaitingDelete {
-		if currentStatus, ok := response.Body["status"].(string); ok {
-			for _, ds := range b.ResourceConfig.DeletingStatuses {
-				if currentStatus == ds {
-					pendingDeletes.Delete(request.NativeID)
-					log.Debug("base resource Status saw deleting status → delete complete",
-						"resourceType", b.ResourceConfig.ResourceType, "status", currentStatus)
-					return &resource.StatusResult{
-						ProgressResult: &resource.ProgressResult{
-							Operation:       resource.OperationDelete,
-							OperationStatus: resource.OperationStatusSuccess,
-							RequestID:       request.RequestID,
-							NativeID:        request.NativeID,
-						},
-					}, nil
-				}
+	// OVH does not always return 404 for deleted resources — instances, for
+	// example, surface {status:"DELETED"} on GET for a while before the row
+	// is reaped. Treat any status in DeletingStatuses as "gone enough" and
+	// report Success.
+	if currentStatus, ok := response.Body["status"].(string); ok {
+		for _, ds := range b.ResourceConfig.DeletingStatuses {
+			if currentStatus == ds {
+				log.Debug("base resource Status saw deleting status → operation complete",
+					"resourceType", b.ResourceConfig.ResourceType, "status", currentStatus)
+				return &resource.StatusResult{
+					ProgressResult: &resource.ProgressResult{
+						Operation:       resource.OperationCheckStatus,
+						OperationStatus: resource.OperationStatusSuccess,
+						RequestID:       request.RequestID,
+						NativeID:        request.NativeID,
+					},
+				}, nil
 			}
 		}
-		return &resource.StatusResult{
-			ProgressResult: &resource.ProgressResult{
-				Operation:       resource.OperationDelete,
-				OperationStatus: resource.OperationStatusInProgress,
-				StatusMessage:   "Resource still present; waiting for delete to complete",
-				RequestID:       request.RequestID,
-				NativeID:        request.NativeID,
-			},
-		}, nil
 	}
 
 	if b.StatusChecker == nil {
+		// AsyncDelete with no readiness check and resource still present →
+		// keep polling until 404 / DeletingStatus.
+		if b.ResourceConfig.AsyncDelete {
+			return &resource.StatusResult{
+				ProgressResult: &resource.ProgressResult{
+					Operation:       resource.OperationCheckStatus,
+					OperationStatus: resource.OperationStatusInProgress,
+					RequestID:       request.RequestID,
+					NativeID:        request.NativeID,
+				},
+			}, nil
+		}
 		return &resource.StatusResult{
 			ProgressResult: &resource.ProgressResult{
 				Operation:       resource.OperationCheckStatus,
