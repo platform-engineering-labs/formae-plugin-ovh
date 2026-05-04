@@ -105,6 +105,13 @@ func (p *serviceProvisioner) Read(ctx context.Context, request *resource.ReadReq
 		return &resource.ReadResult{ErrorCode: resource.OperationErrorCodeServiceInternalError}, nil
 	}
 
+	// serviceName and engine are URL parameters, not in the OVH API body.
+	// Inject them so discovery sync passes formae's required-field validation.
+	if response.Body != nil {
+		response.Body["serviceName"] = project
+		response.Body["engine"] = engine
+	}
+
 	propsJSON, _ := json.Marshal(response.Body)
 	return &resource.ReadResult{Properties: string(propsJSON)}, nil
 }
@@ -250,6 +257,12 @@ func (p *serviceProvisioner) Status(ctx context.Context, request *resource.Statu
 				NativeID:        request.NativeID,
 			},
 		}, nil
+	}
+
+	// Inject URL-only fields so ResourceProperties satisfies required-field validation.
+	if response.Body != nil {
+		response.Body["serviceName"] = project
+		response.Body["engine"] = engine
 	}
 
 	propsJSON, _ := json.Marshal(response.Body)

@@ -69,7 +69,11 @@ func (p *ipRestrictionProvisioner) Create(ctx context.Context, request *resource
 	}
 
 	nativeID := fmt.Sprintf("%s/%s/%s", project, kubeID, ip)
-	propsJSON, _ := json.Marshal(map[string]interface{}{"ip": ip})
+	propsJSON, _ := json.Marshal(map[string]interface{}{
+		"ip":          ip,
+		"serviceName": project,
+		"kubeId":      kubeID,
+	})
 
 	return &resource.CreateResult{
 		ProgressResult: &resource.ProgressResult{
@@ -99,7 +103,13 @@ func (p *ipRestrictionProvisioner) Read(ctx context.Context, request *resource.R
 
 	for _, existing := range currentIPs {
 		if existing == ip {
-			propsJSON, _ := json.Marshal(map[string]interface{}{"ip": ip})
+			// Include URL-only fields (serviceName, kubeId) so discovered
+			// resources pass formae's required-field validation.
+			propsJSON, _ := json.Marshal(map[string]interface{}{
+				"ip":          ip,
+				"serviceName": project,
+				"kubeId":      kubeID,
+			})
 			return &resource.ReadResult{Properties: string(propsJSON)}, nil
 		}
 	}

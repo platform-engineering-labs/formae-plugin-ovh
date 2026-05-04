@@ -105,6 +105,14 @@ func (p *nodePoolProvisioner) Read(ctx context.Context, request *resource.ReadRe
 	}
 
 	log.Debug("kube nodepool read response", "body", response.Body)
+
+	// serviceName and kubeId are URL parameters, not in the OVH API body. Inject
+	// them so discovery sync passes formae's required-field validation.
+	if response.Body != nil {
+		response.Body["serviceName"] = project
+		response.Body["kubeId"] = kubeID
+	}
+
 	propsJSON, _ := json.Marshal(response.Body)
 	return &resource.ReadResult{Properties: string(propsJSON)}, nil
 }
@@ -283,6 +291,12 @@ func (p *nodePoolProvisioner) Status(ctx context.Context, request *resource.Stat
 				NativeID:        request.NativeID,
 			},
 		}, nil
+	}
+
+	// Inject URL-only fields so ResourceProperties satisfies required-field validation.
+	if response.Body != nil {
+		response.Body["serviceName"] = project
+		response.Body["kubeId"] = kubeID
 	}
 
 	propsJSON, _ := json.Marshal(response.Body)

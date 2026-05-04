@@ -45,6 +45,13 @@ func init() {
 				Scope:          &base.ScopeConfig{Type: base.ScopeProject},
 				SupportsUpdate: true,
 				UpdateMethod:   base.UpdateMethodPut,
+				// Schema requires containerName + region; OVH's GET response
+				// uses `name` and lacks `region`/`containerName`. Inject the
+				// URL-derived values so discovery sync passes validation.
+				URLFieldInjection: map[string]string{
+					"containerName": "ResourceName",
+					"region":        "Region",
+				},
 			},
 			RequestTransformer: containerRegionTransformer,
 			Operations: []resource.Operation{

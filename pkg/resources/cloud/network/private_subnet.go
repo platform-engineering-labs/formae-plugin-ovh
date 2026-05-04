@@ -121,6 +121,7 @@ func (p *PrivateSubnetProvisioner) Create(ctx context.Context, request *resource
 			}
 
 			result := transformSubnetResponse(subnet, networkID)
+			result["networkId"] = networkID
 			propsJSON, err := json.Marshal(result)
 			if err != nil {
 				return privateSubnetCreateFailure(resource.OperationErrorCodeServiceInternalError, fmt.Sprintf("failed to marshal properties: %v", err)), nil
@@ -199,7 +200,11 @@ func (p *PrivateSubnetProvisioner) Read(ctx context.Context, request *resource.R
 			// API returns: {id, cidr, gatewayIp, ipPools: [{dhcp, end, network, region, start}]}
 			// Schema expects: {id, network_id, region, network, dhcp, noGateway, start, end}
 			result := transformSubnetResponse(subnet, networkID)
-
+			// Inject URL-only required fields (networkId is in URL, schema
+			// declares it required). transformSubnetResponse already keys
+			// it as `network_id` via outputField; also expose it under the
+			// PKL field name so required-field validation passes.
+			result["networkId"] = networkID
 			propsJSON, err := json.Marshal(result)
 			if err != nil {
 				return &resource.ReadResult{

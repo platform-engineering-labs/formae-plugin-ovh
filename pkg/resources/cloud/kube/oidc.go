@@ -112,6 +112,13 @@ func (p *oidcProvisioner) Read(ctx context.Context, request *resource.ReadReques
 		return &resource.ReadResult{ErrorCode: resource.OperationErrorCodeNotFound}, nil
 	}
 
+	// serviceName and kubeId are URL parameters, not in the OVH API body. Inject
+	// them so discovery sync passes formae's required-field validation.
+	if response.Body != nil {
+		response.Body["serviceName"] = project
+		response.Body["kubeId"] = kubeID
+	}
+
 	propsJSON, _ := json.Marshal(response.Body)
 	return &resource.ReadResult{Properties: string(propsJSON)}, nil
 }
@@ -304,6 +311,11 @@ func (p *oidcProvisioner) Status(ctx context.Context, request *resource.StatusRe
 	})
 	var propsJSON []byte
 	if err == nil {
+		// Inject URL-only fields so ResourceProperties satisfies required-field validation.
+		if oidc.Body != nil {
+			oidc.Body["serviceName"] = project
+			oidc.Body["kubeId"] = kubeID
+		}
 		propsJSON, _ = json.Marshal(oidc.Body)
 	}
 

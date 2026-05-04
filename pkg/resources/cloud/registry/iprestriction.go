@@ -61,6 +61,9 @@ func (p *ipRestrictionProvisioner) Create(ctx context.Context, request *resource
 		if existingIP, _ := existing["ipBlock"].(string); existingIP == ipBlock {
 			// Already exists
 			nativeID := fmt.Sprintf("%s/%s/%s/%s", project, registryID, restrictionType, ipBlock)
+			existing["serviceName"] = project
+			existing["registryId"] = registryID
+			existing["type"] = restrictionType
 			propsJSON, _ := json.Marshal(existing)
 			return &resource.CreateResult{
 				ProgressResult: &resource.ProgressResult{
@@ -91,6 +94,9 @@ func (p *ipRestrictionProvisioner) Create(ctx context.Context, request *resource
 	// Native ID: project/registryId/type/ipBlock
 	nativeID := fmt.Sprintf("%s/%s/%s/%s", project, registryID, restrictionType, ipBlock)
 
+	newRestriction["serviceName"] = project
+	newRestriction["registryId"] = registryID
+	newRestriction["type"] = restrictionType
 	propsJSON, _ := json.Marshal(newRestriction)
 
 	return &resource.CreateResult{
@@ -122,6 +128,12 @@ func (p *ipRestrictionProvisioner) Read(ctx context.Context, request *resource.R
 	// Find the specific IP
 	for _, existing := range currentIPs {
 		if existingIP, _ := existing["ipBlock"].(string); existingIP == ipBlock {
+			// serviceName, registryId, and type are URL parameters, not in the
+			// OVH API body. Inject them so discovery sync passes formae's
+			// required-field validation.
+			existing["serviceName"] = project
+			existing["registryId"] = registryID
+			existing["type"] = restrictionType
 			propsJSON, _ := json.Marshal(existing)
 			return &resource.ReadResult{Properties: string(propsJSON)}, nil
 		}

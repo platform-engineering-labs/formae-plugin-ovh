@@ -45,6 +45,9 @@ func init() {
 				Scope:          &base.ScopeConfig{Type: base.ScopeZone},
 				SupportsUpdate: true,
 				UpdateMethod:   base.UpdateMethodPut,
+				URLFieldInjection: map[string]string{
+					"zone": "Zone",
+				},
 			},
 			Operations: []resource.Operation{
 				resource.OperationCreate,
@@ -63,6 +66,9 @@ func init() {
 				Scope:          &base.ScopeConfig{Type: base.ScopeZone},
 				SupportsUpdate: true,
 				UpdateMethod:   base.UpdateMethodPut,
+				URLFieldInjection: map[string]string{
+					"zone": "Zone",
+				},
 			},
 			Operations: []resource.Operation{
 				resource.OperationCreate,
