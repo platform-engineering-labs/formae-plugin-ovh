@@ -105,6 +105,21 @@ func (p *nodePoolProvisioner) Read(ctx context.Context, request *resource.ReadRe
 	}
 
 	log.Debug("kube nodepool read response", "body", response.Body)
+
+	// serviceName and kubeId are URL parameters, not in the OVH API body. Inject
+	// them so discovery sync passes formae's required-field validation.
+	// OVH returns the flavor as "flavor" but the schema's required field is
+	// "flavorName" — mirror it so validation passes on discovery.
+	if response.Body != nil {
+		response.Body["serviceName"] = project
+		response.Body["kubeId"] = kubeID
+		if _, has := response.Body["flavorName"]; !has {
+			if f, ok := response.Body["flavor"].(string); ok && f != "" {
+				response.Body["flavorName"] = f
+			}
+		}
+	}
+
 	propsJSON, _ := json.Marshal(response.Body)
 	return &resource.ReadResult{Properties: string(propsJSON)}, nil
 }
@@ -198,28 +213,47 @@ func (p *nodePoolProvisioner) Delete(ctx context.Context, request *resource.Dele
 	}, nil
 }
 
+// List enumerates node pools across the project. Discovery calls List with
+// empty AdditionalProperties, so when no kubeId is supplied we iterate every
+// cluster in the project.
 func (p *nodePoolProvisioner) List(ctx context.Context, request *resource.ListRequest) (*resource.ListResult, error) {
 	project := extractProjectFromAdditional(request.TargetConfig, request.AdditionalProperties)
-	kubeID := request.AdditionalProperties["kubeId"]
-
-	if project == "" || kubeID == "" {
+	if project == "" {
 		return &resource.ListResult{NativeIDs: nil}, nil
 	}
 
-	url := fmt.Sprintf("/cloud/project/%s/kube/%s/nodepool", project, kubeID)
-
-	response, err := p.client.Do(ctx, ovhtransport.RequestOptions{
-		Method: "GET",
-		Path:   url,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to list node pools: %w", err)
+	kubeIDs := []string{}
+	if k := request.AdditionalProperties["kubeId"]; k != "" {
+		kubeIDs = append(kubeIDs, k)
+	} else {
+		all, err := listClusterIDs(ctx, p.client, project)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list kube clusters: %w", err)
+		}
+		kubeIDs = all
 	}
 
 	var nativeIDs []string
-	for _, item := range response.BodyArray {
-		if id, ok := item.(string); ok {
-			nativeIDs = append(nativeIDs, fmt.Sprintf("%s/%s/%s", project, kubeID, id))
+	for _, kubeID := range kubeIDs {
+		response, err := p.client.Do(ctx, ovhtransport.RequestOptions{
+			Method: "GET",
+			Path:   fmt.Sprintf("/cloud/project/%s/kube/%s/nodepool", project, kubeID),
+		})
+		if err != nil {
+			// Cluster gone or transient — skip rather than fail the whole listing.
+			continue
+		}
+		// OVH nodepool list may return either an array of ID strings or an array
+		// of full nodepool objects depending on the API version. Handle both.
+		for _, item := range response.BodyArray {
+			switch v := item.(type) {
+			case string:
+				nativeIDs = append(nativeIDs, fmt.Sprintf("%s/%s/%s", project, kubeID, v))
+			case map[string]interface{}:
+				if id, ok := v["id"].(string); ok && id != "" {
+					nativeIDs = append(nativeIDs, fmt.Sprintf("%s/%s/%s", project, kubeID, id))
+				}
+			}
 		}
 	}
 
@@ -283,6 +317,18 @@ func (p *nodePoolProvisioner) Status(ctx context.Context, request *resource.Stat
 				NativeID:        request.NativeID,
 			},
 		}, nil
+	}
+
+	// Inject URL-only fields so ResourceProperties satisfies required-field validation.
+	// flavorName mirrors OVH's "flavor" since the schema declares flavorName required.
+	if response.Body != nil {
+		response.Body["serviceName"] = project
+		response.Body["kubeId"] = kubeID
+		if _, has := response.Body["flavorName"]; !has {
+			if f, ok := response.Body["flavor"].(string); ok && f != "" {
+				response.Body["flavorName"] = f
+			}
+		}
 	}
 
 	propsJSON, _ := json.Marshal(response.Body)

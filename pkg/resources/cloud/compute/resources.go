@@ -68,6 +68,11 @@ func init() {
 				UpdateMethod:     base.UpdateMethodPut,
 				AsyncDelete:      true,
 				DeletingStatuses: []string{"DELETED", "DELETING"},
+				// `region` is a URL parameter; OVH's GET response uses
+				// `region` already, but Read derives it from the URL only.
+				URLFieldInjection: map[string]string{
+					"region": "Region",
+				},
 			},
 			ResponseTransformer: instanceTransformer,
 			StatusChecker:       instanceStatusChecker,
@@ -114,6 +119,9 @@ func init() {
 				SupportsUpdate:   true,
 				UpdateMethod:     base.UpdateMethodPut,
 				DeletingStatuses: []string{"deleting", "deleted"},
+				URLFieldInjection: map[string]string{
+					"region": "Region",
+				},
 			},
 			StatusChecker: volumeStatusChecker,
 			Operations: []resource.Operation{

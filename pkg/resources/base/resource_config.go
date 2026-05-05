@@ -75,4 +75,13 @@ type ResourceConfig struct {
 	// formae owns the polling cadence and the plugin avoids hard-coded
 	// timeouts.
 	AsyncDelete bool
+
+	// URLFieldInjection injects PathContext fields back into the response body
+	// when those fields are required by the schema but only present in the URL
+	// (e.g. serviceName, region). Map keys are body field names; values are
+	// PathContext field names ("Project", "Region", "Zone", "Location",
+	// "Engine", "ParentResource"). Without this, formae's resource_persister
+	// silently drops discovered resources whose required schema fields are
+	// URL-only.
+	URLFieldInjection map[string]string
 }

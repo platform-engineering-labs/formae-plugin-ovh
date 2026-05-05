@@ -99,6 +99,13 @@ func (p *userProvisioner) Read(ctx context.Context, request *resource.ReadReques
 		return &resource.ReadResult{ErrorCode: resource.OperationErrorCodeServiceInternalError}, nil
 	}
 
+	// serviceName and registryId are URL parameters, not in the OVH API body.
+	// Inject them so discovery sync passes formae's required-field validation.
+	if response.Body != nil {
+		response.Body["serviceName"] = project
+		response.Body["registryId"] = registryID
+	}
+
 	propsJSON, _ := json.Marshal(response.Body)
 	return &resource.ReadResult{Properties: string(propsJSON)}, nil
 }

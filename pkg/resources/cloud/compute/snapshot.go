@@ -109,6 +109,11 @@ func init() {
 				PropertyName:   "volume_id",
 			},
 			SupportsUpdate: false, // Snapshots are immutable
+			// Schema requires volume_id; OVH's GET response doesn't return it
+			// because it's a URL parameter. Inject from the parent segment.
+			URLFieldInjection: map[string]string{
+				"volume_id": "ParentResource",
+			},
 		},
 		RequestTransformer: volumeSnapshotTransformer,
 		Operations: []resource.Operation{

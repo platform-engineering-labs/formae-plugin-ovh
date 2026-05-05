@@ -29,6 +29,42 @@ type BaseResource struct {
 	Client              TransportClient
 }
 
+// injectURLFields copies values from pathCtx back into the response body for
+// fields declared in ResourceConfig.URLFieldInjection. The returned map is
+// either the (possibly-modified) input or a new map when input was nil and
+// any field needs injecting.
+func (b *BaseResource) injectURLFields(props map[string]interface{}, pathCtx PathContext) map[string]interface{} {
+	if len(b.ResourceConfig.URLFieldInjection) == 0 {
+		return props
+	}
+	if props == nil {
+		props = make(map[string]interface{})
+	}
+	for bodyField, ctxField := range b.ResourceConfig.URLFieldInjection {
+		var v string
+		switch ctxField {
+		case "Project":
+			v = pathCtx.Project
+		case "Region":
+			v = pathCtx.Region
+		case "Zone":
+			v = pathCtx.Zone
+		case "Location":
+			v = pathCtx.Location
+		case "Engine":
+			v = pathCtx.Engine
+		case "ParentResource":
+			v = pathCtx.ParentResource
+		case "ResourceName":
+			v = pathCtx.ResourceName
+		}
+		if v != "" {
+			props[bodyField] = v
+		}
+	}
+	return props
+}
+
 // mapKeys returns sorted map keys for stable debug logging.
 func mapKeys(m map[string]interface{}) []string {
 	keys := make([]string, 0, len(m))
@@ -163,6 +199,7 @@ func (b *BaseResource) Create(ctx context.Context, request *resource.CreateReque
 		transformCtx := b.buildTransformContext(ctx, pathCtx, resource.OperationCreate)
 		responseProps = b.ResponseTransformer.Transform(responseProps, transformCtx)
 	}
+	responseProps = b.injectURLFields(responseProps, pathCtx)
 
 	propsJSON, _ := json.Marshal(responseProps)
 
@@ -254,6 +291,7 @@ func (b *BaseResource) Read(ctx context.Context, request *resource.ReadRequest) 
 		transformCtx := b.buildTransformContext(ctx, pathCtx, resource.OperationRead)
 		responseProps = b.ResponseTransformer.Transform(responseProps, transformCtx)
 	}
+	responseProps = b.injectURLFields(responseProps, pathCtx)
 
 	propsJSON, _ := json.Marshal(responseProps)
 
@@ -346,6 +384,7 @@ func (b *BaseResource) Update(ctx context.Context, request *resource.UpdateReque
 		transformCtx := b.buildTransformContext(ctx, pathCtx, resource.OperationUpdate)
 		responseProps = b.ResponseTransformer.Transform(responseProps, transformCtx)
 	}
+	responseProps = b.injectURLFields(responseProps, pathCtx)
 
 	propsJSON, _ := json.Marshal(responseProps)
 
@@ -768,6 +807,7 @@ func (b *BaseResource) Status(ctx context.Context, request *resource.StatusReque
 		transformCtx := b.buildTransformContext(ctx, pathCtx, resource.OperationCheckStatus)
 		responseProps = b.ResponseTransformer.Transform(responseProps, transformCtx)
 	}
+	responseProps = b.injectURLFields(responseProps, pathCtx)
 
 	propsJSON, _ := json.Marshal(responseProps)
 	return &resource.StatusResult{

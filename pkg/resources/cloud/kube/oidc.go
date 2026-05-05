@@ -112,6 +112,13 @@ func (p *oidcProvisioner) Read(ctx context.Context, request *resource.ReadReques
 		return &resource.ReadResult{ErrorCode: resource.OperationErrorCodeNotFound}, nil
 	}
 
+	// serviceName and kubeId are URL parameters, not in the OVH API body. Inject
+	// them so discovery sync passes formae's required-field validation.
+	if response.Body != nil {
+		response.Body["serviceName"] = project
+		response.Body["kubeId"] = kubeID
+	}
+
 	propsJSON, _ := json.Marshal(response.Body)
 	return &resource.ReadResult{Properties: string(propsJSON)}, nil
 }
@@ -207,34 +214,46 @@ func (p *oidcProvisioner) Delete(ctx context.Context, request *resource.DeleteRe
 	}, nil
 }
 
+// List enumerates OIDC integrations across the project. Discovery calls List
+// with empty AdditionalProperties, so when no kubeId is supplied we iterate
+// every cluster in the project. OIDC is a singleton per cluster — at most one
+// native ID per cluster.
 func (p *oidcProvisioner) List(ctx context.Context, request *resource.ListRequest) (*resource.ListResult, error) {
 	project := extractProjectFromAdditional(request.TargetConfig, request.AdditionalProperties)
-	kubeID := request.AdditionalProperties["kubeId"]
-
-	if project == "" || kubeID == "" {
+	if project == "" {
 		return &resource.ListResult{NativeIDs: nil}, nil
 	}
 
-	url := fmt.Sprintf("/cloud/project/%s/kube/%s/openIdConnect", project, kubeID)
-
-	response, err := p.client.Do(ctx, ovhtransport.RequestOptions{
-		Method: "GET",
-		Path:   url,
-	})
-	if err != nil {
-		// No OIDC configured (or 404) — treat as empty list
-		return &resource.ListResult{NativeIDs: nil}, nil
+	kubeIDs := []string{}
+	if k := request.AdditionalProperties["kubeId"]; k != "" {
+		kubeIDs = append(kubeIDs, k)
+	} else {
+		all, err := listClusterIDs(ctx, p.client, project)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list kube clusters: %w", err)
+		}
+		kubeIDs = all
 	}
 
-	// OVH returns 200 with an empty body when OIDC is not configured; only
-	// report a native ID when an integration is actually present.
-	if clientID, _ := response.Body["clientId"].(string); clientID == "" {
-		return &resource.ListResult{NativeIDs: nil}, nil
+	var nativeIDs []string
+	for _, kubeID := range kubeIDs {
+		response, err := p.client.Do(ctx, ovhtransport.RequestOptions{
+			Method: "GET",
+			Path:   fmt.Sprintf("/cloud/project/%s/kube/%s/openIdConnect", project, kubeID),
+		})
+		if err != nil {
+			// No OIDC configured (or 404) — skip this cluster.
+			continue
+		}
+		// OVH returns 200 with an empty body when OIDC is not configured; only
+		// report a native ID when an integration is actually present.
+		if clientID, _ := response.Body["clientId"].(string); clientID == "" {
+			continue
+		}
+		nativeIDs = append(nativeIDs, fmt.Sprintf("%s/%s", project, kubeID))
 	}
 
-	return &resource.ListResult{
-		NativeIDs: []string{fmt.Sprintf("%s/%s", project, kubeID)},
-	}, nil
+	return &resource.ListResult{NativeIDs: nativeIDs}, nil
 }
 
 // Status polls the parent cluster's status. OIDC has no state of its own; the
@@ -304,6 +323,11 @@ func (p *oidcProvisioner) Status(ctx context.Context, request *resource.StatusRe
 	})
 	var propsJSON []byte
 	if err == nil {
+		// Inject URL-only fields so ResourceProperties satisfies required-field validation.
+		if oidc.Body != nil {
+			oidc.Body["serviceName"] = project
+			oidc.Body["kubeId"] = kubeID
+		}
 		propsJSON, _ = json.Marshal(oidc.Body)
 	}
 

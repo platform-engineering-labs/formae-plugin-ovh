@@ -5,6 +5,7 @@
 package kube
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -12,6 +13,27 @@ import (
 	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 	ovhtransport "github.com/platform-engineering-labs/formae-plugin-ovh/pkg/transport/ovh"
 )
+
+// listClusterIDs returns all kube cluster IDs for a project. Used by child
+// resources (NodePool, IpRestriction, Oidc) during discovery — formae calls
+// their List with empty AdditionalProperties, so they must enumerate parents
+// themselves rather than rely on a kubeId being passed in.
+func listClusterIDs(ctx context.Context, client *ovhtransport.Client, project string) ([]string, error) {
+	resp, err := client.Do(ctx, ovhtransport.RequestOptions{
+		Method: "GET",
+		Path:   fmt.Sprintf("/cloud/project/%s/kube", project),
+	})
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(resp.BodyArray))
+	for _, item := range resp.BodyArray {
+		if id, ok := item.(string); ok {
+			ids = append(ids, id)
+		}
+	}
+	return ids, nil
+}
 
 // extractProject extracts project from target config or props
 func extractProject(targetConfig json.RawMessage, props map[string]interface{}) string {

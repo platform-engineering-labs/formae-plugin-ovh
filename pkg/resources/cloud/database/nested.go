@@ -122,6 +122,14 @@ func (p *nestedProvisioner) Read(ctx context.Context, request *resource.ReadRequ
 		return &resource.ReadResult{ErrorCode: resource.OperationErrorCodeServiceInternalError}, nil
 	}
 
+	// serviceName, engine, and clusterId are URL parameters, not in the OVH API
+	// body. Inject them so discovery sync passes formae's required-field validation.
+	if response.Body != nil {
+		response.Body["serviceName"] = project
+		response.Body["engine"] = engine
+		response.Body["clusterId"] = clusterID
+	}
+
 	propsJSON, _ := json.Marshal(response.Body)
 	return &resource.ReadResult{Properties: string(propsJSON)}, nil
 }
