@@ -176,22 +176,36 @@ func (p *ipRestrictionProvisioner) Delete(ctx context.Context, request *resource
 	}, nil
 }
 
+// List enumerates IP restrictions across the project. Discovery calls List
+// with empty AdditionalProperties, so when no kubeId is supplied we iterate
+// every cluster in the project.
 func (p *ipRestrictionProvisioner) List(ctx context.Context, request *resource.ListRequest) (*resource.ListResult, error) {
 	project := extractProjectFromAdditional(request.TargetConfig, request.AdditionalProperties)
-	kubeID := request.AdditionalProperties["kubeId"]
-
-	if project == "" || kubeID == "" {
+	if project == "" {
 		return &resource.ListResult{NativeIDs: nil}, nil
 	}
 
-	currentIPs, err := p.listIPRestrictions(ctx, project, kubeID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list IP restrictions: %w", err)
+	kubeIDs := []string{}
+	if k := request.AdditionalProperties["kubeId"]; k != "" {
+		kubeIDs = append(kubeIDs, k)
+	} else {
+		all, err := listClusterIDs(ctx, p.client, project)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list kube clusters: %w", err)
+		}
+		kubeIDs = all
 	}
 
-	nativeIDs := make([]string, 0, len(currentIPs))
-	for _, ip := range currentIPs {
-		nativeIDs = append(nativeIDs, fmt.Sprintf("%s/%s/%s", project, kubeID, ip))
+	var nativeIDs []string
+	for _, kubeID := range kubeIDs {
+		currentIPs, err := p.listIPRestrictions(ctx, project, kubeID)
+		if err != nil {
+			// Cluster gone or transient — skip rather than fail the whole listing.
+			continue
+		}
+		for _, ip := range currentIPs {
+			nativeIDs = append(nativeIDs, fmt.Sprintf("%s/%s/%s", project, kubeID, ip))
+		}
 	}
 
 	return &resource.ListResult{NativeIDs: nativeIDs}, nil
