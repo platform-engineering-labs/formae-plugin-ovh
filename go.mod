@@ -6,7 +6,7 @@ require (
 	github.com/gophercloud/gophercloud/v2 v2.12.0
 	github.com/ovh/go-ovh v1.9.0
 	github.com/platform-engineering-labs/formae/pkg/model v0.1.23
-	github.com/platform-engineering-labs/formae/pkg/plugin v0.2.2-0.20260425033718-2ccb40eaf779
+	github.com/platform-engineering-labs/formae/pkg/plugin v0.2.2
 	github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.2.3
 	github.com/stretchr/testify v1.11.1
 )
