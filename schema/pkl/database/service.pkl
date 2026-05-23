@@ -47,7 +47,7 @@ open class Node extends formae.SubResource {
   region: String
 
   /// OpenStack private network ID (for private networking)
-  @ovh.FieldHint { createOnly = true }
+  @ovh.FieldHint { createOnly = true; edgeKind = "runtimeDependency" }
   networkId: String?
 
   /// Private subnet ID
