@@ -55,9 +55,11 @@ open class Integration extends formae.Resource {
   destinationServiceId: (String|formae.Resolvable)
 
   /// Source service ID (if different from clusterId)
+  @ovh.FieldHint { createOnly = true }
   sourceServiceId: (String|formae.Resolvable)?
 
   /// Integration-specific parameters
+  @ovh.FieldHint { createOnly = true }
   parameters: Mapping<String, String>?
 
   // === Computed/Output fields ===

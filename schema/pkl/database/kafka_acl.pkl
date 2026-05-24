@@ -48,7 +48,7 @@ open class KafkaAcl extends formae.Resource {
   topic: String
 
   /// Permission level
-  @ovh.FieldHint { required = true }
+  @ovh.FieldHint { required = true; createOnly = true }
   permission: KafkaPermission
 
   // === Computed/Output fields ===
