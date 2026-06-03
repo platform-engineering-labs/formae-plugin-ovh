@@ -13,6 +13,20 @@ on:
         required: false
         default: "main"
         type: string
+      formae_version:
+        description: |
+          Formae version baked into the binary via VERSION (also propagated to
+          plugins as FORMAE_VERSION; plugins use it to resolve their PKL formae
+          schema dep against package://...formae@<version>). Defaults to the
+          canonical X.Y.Z derived from the latest tag on the formae branch —
+          including dev tags, so a newly tagged 0.86.0-dev.N is picked up
+          automatically. Set this explicitly to test an unreleased schema that
+          has been pre-released via formae's schema-prerelease workflow but has
+          no matching tag yet (e.g. formae_version=0.86.0 while 0.85.2 is the
+          latest tag).
+        required: false
+        default: ""
+        type: string
 
 # Prevent concurrent conformance tests (CI and nightly share test resources)
 concurrency:
@@ -108,9 +122,27 @@ jobs:
           cd /tmp/formae
           git fetch --tags
           # Get latest release tag (sorted by semver) and pass to make
-          LATEST_TAG=$(git tag -l "[0-9]*" --sort=-version:refname | grep -v -- '-' | head -1)
-          echo "Building formae with VERSION=${LATEST_TAG}"
-          make build VERSION="${LATEST_TAG}"
+          # The version baked via VERSION becomes formae.Version at runtime and
+          # is propagated to plugins as FORMAE_VERSION. Plugins use it to resolve
+          # their formae PKL dep against package://...formae@<version> on the
+          # hub, so it must match a schema that has been published. The nightly
+          # validates plugin main against formae main, so we pick the latest tag
+          # on the branch — including dev tags — since that is the most recent
+          # published schema. The canonical X.Y.Z is stripped from any -dev.N
+          # suffix to match how formae publishes schemas (a 0.86.0-dev.N release,
+          # and the schema-prerelease workflow, both publish at formae@0.86.0).
+          # An explicit formae_version input overrides this — use it to test an
+          # unreleased, pre-released schema that has no matching tag yet.
+          VERSION="${{ inputs.formae_version }}"
+          if [ -z "$VERSION" ]; then
+            LATEST_TAG=$(git tag -l "[0-9]*" --sort=-version:refname | head -1)
+            VERSION=$(echo "$LATEST_TAG" | cut -d'-' -f1)
+            echo "No formae_version input; latest tag=${LATEST_TAG}, using canonical VERSION=${VERSION}"
+          else
+            echo "Using formae_version input: ${VERSION}"
+          fi
+          echo "Building formae with VERSION=${VERSION}"
+          make build VERSION="${VERSION}"
           echo "FORMAE_BINARY=/tmp/formae/formae" >> $GITHUB_ENV
 
       # Temporary: until Orbital package manager handles plugin version
