@@ -481,7 +481,7 @@ func (b *BaseResource) Delete(ctx context.Context, request *resource.DeleteReque
 	}
 
 	// For resources with async deletion (DeletingStatuses configured), wait briefly
-	// for the provider to acknowledge the deletion. OVH has eventual consistency —
+	// for the provider to acknowledge the deletion. OVH has eventual consistency -
 	// a volume may still be readable with its original status right after DELETE.
 	// This read-after-write loop ensures subsequent Read/sync calls see the resource
 	// as gone or in a deleting state, preventing OOB delete detection failures.
@@ -493,7 +493,7 @@ func (b *BaseResource) Delete(ctx context.Context, request *resource.DeleteReque
 				Path:   url,
 			})
 			if readErr != nil {
-				break // 404 or other error — resource is gone
+				break // 404 or other error - resource is gone
 			}
 			if status, ok := resp.Body["status"].(string); ok {
 				isDeletingStatus := false
@@ -709,7 +709,7 @@ func (b *BaseResource) Status(ctx context.Context, request *resource.StatusReque
 		"responseKeys", mapKeys(response.Body),
 		"status", response.Body["status"])
 
-	// OVH does not always return 404 for deleted resources — instances, for
+	// OVH does not always return 404 for deleted resources - instances, for
 	// example, surface {status:"DELETED"} on GET for a while before the row
 	// is reaped. Treat any status in DeletingStatuses as "gone enough" and
 	// report Success.

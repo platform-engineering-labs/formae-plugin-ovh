@@ -109,7 +109,7 @@ func (p *nodePoolProvisioner) Read(ctx context.Context, request *resource.ReadRe
 	// serviceName and kubeId are URL parameters, not in the OVH API body. Inject
 	// them so discovery sync passes formae's required-field validation.
 	// OVH returns the flavor as "flavor" but the schema's required field is
-	// "flavorName" — mirror it so validation passes on discovery.
+	// "flavorName" - mirror it so validation passes on discovery.
 	if response.Body != nil {
 		response.Body["serviceName"] = project
 		response.Body["kubeId"] = kubeID
@@ -240,7 +240,7 @@ func (p *nodePoolProvisioner) List(ctx context.Context, request *resource.ListRe
 			Path:   fmt.Sprintf("/cloud/project/%s/kube/%s/nodepool", project, kubeID),
 		})
 		if err != nil {
-			// Cluster gone or transient — skip rather than fail the whole listing.
+			// Cluster gone or transient - skip rather than fail the whole listing.
 			continue
 		}
 		// OVH nodepool list may return either an array of ID strings or an array
@@ -274,7 +274,7 @@ func (p *nodePoolProvisioner) Status(ctx context.Context, request *resource.Stat
 	})
 	if err != nil {
 		if transportErr, ok := err.(*ovhtransport.Error); ok {
-			// 404 means the node pool is gone — terminal success state for a
+			// 404 means the node pool is gone - terminal success state for a
 			// delete poll. For create/update polls this shouldn't happen, but
 			// returning Success is still the right signal: the resource that
 			// formae was tracking no longer exists, so further polling is moot.

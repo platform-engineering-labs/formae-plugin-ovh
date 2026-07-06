@@ -83,8 +83,8 @@ target: formae.Target = new formae.Target {
 
 This plugin requires **two sets of credentials**:
 
-1. **OVH Cloud API** — for OVH-specific resources (DNS, Database, Kube, Registry)
-2. **OpenStack API** — for infrastructure resources (Compute, Network, Storage)
+1. **OVH Cloud API** - for OVH-specific resources (DNS, Database, Kube, Registry)
+2. **OpenStack API** - for infrastructure resources (Compute, Network, Storage)
 
 #### OVH Cloud API Credentials
 
@@ -104,7 +104,7 @@ export OVH_CLOUD_PROJECT_ID="your-project-id"
 | US | https://api.us.ovhcloud.com/createApp/ | https://api.us.ovhcloud.com/createToken/ |
 | CA | https://ca.api.ovh.com/createApp/ | https://ca.api.ovh.com/createToken/ |
 
-1. **Create an application** at the `/createApp/` URL for your region — note the Application Key and Secret
+1. **Create an application** at the `/createApp/` URL for your region - note the Application Key and Secret
 2. **Request a consumer key** using the API (the `/createToken/` web UI may not work for all account types):
    ```bash
    curl -X POST "https://eu.api.ovh.com/1.0/auth/credential" \

@@ -107,7 +107,7 @@ func (p *oidcProvisioner) Read(ctx context.Context, request *resource.ReadReques
 
 	// OVH's GET returns 200 with empty fields when OIDC is not configured (post-delete)
 	// rather than 404. An empty clientId means no integration exists, so report NotFound
-	// — without this check, formae's sync never detects out-of-band deletions.
+	// - without this check, formae's sync never detects out-of-band deletions.
 	if clientID, _ := response.Body["clientId"].(string); clientID == "" {
 		return &resource.ReadResult{ErrorCode: resource.OperationErrorCodeNotFound}, nil
 	}
@@ -155,7 +155,7 @@ func (p *oidcProvisioner) Update(ctx context.Context, request *resource.UpdateRe
 		return updateFailure(request.NativeID, resource.OperationErrorCodeServiceInternalError, err.Error()), nil
 	}
 
-	// PUT returns void — re-read the current state to populate properties.
+	// PUT returns void - re-read the current state to populate properties.
 	read, err := p.client.Do(ctx, ovhtransport.RequestOptions{Method: "GET", Path: url})
 	var propsJSON []byte
 	if err == nil {
@@ -216,7 +216,7 @@ func (p *oidcProvisioner) Delete(ctx context.Context, request *resource.DeleteRe
 
 // List enumerates OIDC integrations across the project. Discovery calls List
 // with empty AdditionalProperties, so when no kubeId is supplied we iterate
-// every cluster in the project. OIDC is a singleton per cluster — at most one
+// every cluster in the project. OIDC is a singleton per cluster - at most one
 // native ID per cluster.
 func (p *oidcProvisioner) List(ctx context.Context, request *resource.ListRequest) (*resource.ListResult, error) {
 	project := extractProjectFromAdditional(request.TargetConfig, request.AdditionalProperties)
@@ -242,7 +242,7 @@ func (p *oidcProvisioner) List(ctx context.Context, request *resource.ListReques
 			Path:   fmt.Sprintf("/cloud/project/%s/kube/%s/openIdConnect", project, kubeID),
 		})
 		if err != nil {
-			// No OIDC configured (or 404) — skip this cluster.
+			// No OIDC configured (or 404) - skip this cluster.
 			continue
 		}
 		// OVH returns 200 with an empty body when OIDC is not configured; only
@@ -274,7 +274,7 @@ func (p *oidcProvisioner) Status(ctx context.Context, request *resource.StatusRe
 	})
 	if err != nil {
 		if transportErr, ok := err.(*ovhtransport.Error); ok {
-			// Cluster (and therefore OIDC) is gone — treat as terminal Success
+			// Cluster (and therefore OIDC) is gone - treat as terminal Success
 			// so a Delete poll completes cleanly.
 			if transportErr.Code == ovhtransport.ErrorCodeResourceNotFound {
 				return &resource.StatusResult{
@@ -288,7 +288,7 @@ func (p *oidcProvisioner) Status(ctx context.Context, request *resource.StatusRe
 			}
 		}
 		// Any other transport error (5xx, network blip, OVH rate-limit) while
-		// the cluster is mid-REDEPLOYING is transient — keep polling instead
+		// the cluster is mid-REDEPLOYING is transient - keep polling instead
 		// of failing the whole Update/Create command.
 		log.Debug("kube oidc status: cluster GET transient error, retrying", "err", err)
 		return &resource.StatusResult{
@@ -315,7 +315,7 @@ func (p *oidcProvisioner) Status(ctx context.Context, request *resource.StatusRe
 		}, nil
 	}
 
-	// Cluster READY — fetch the current OIDC config to populate properties.
+	// Cluster READY - fetch the current OIDC config to populate properties.
 	oidcURL := fmt.Sprintf("/cloud/project/%s/kube/%s/openIdConnect", project, kubeID)
 	oidc, err := p.client.Do(ctx, ovhtransport.RequestOptions{
 		Method: "GET",

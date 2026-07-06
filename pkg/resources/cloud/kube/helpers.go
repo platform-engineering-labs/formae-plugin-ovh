@@ -15,7 +15,7 @@ import (
 )
 
 // listClusterIDs returns all kube cluster IDs for a project. Used by child
-// resources (NodePool, IpRestriction, Oidc) during discovery — formae calls
+// resources (NodePool, IpRestriction, Oidc) during discovery - formae calls
 // their List with empty AdditionalProperties, so they must enumerate parents
 // themselves rather than rely on a kubeId being passed in.
 func listClusterIDs(ctx context.Context, client *ovhtransport.Client, project string) ([]string, error) {
