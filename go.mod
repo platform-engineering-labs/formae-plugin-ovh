@@ -5,9 +5,9 @@ go 1.26.0
 require (
 	github.com/gophercloud/gophercloud/v2 v2.12.0
 	github.com/ovh/go-ovh v1.9.0
-	github.com/platform-engineering-labs/formae/pkg/model v0.1.23
-	github.com/platform-engineering-labs/formae/pkg/plugin v0.4.0
-	github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.2.3
+	github.com/platform-engineering-labs/formae/pkg/model v0.1.26
+	github.com/platform-engineering-labs/formae/pkg/plugin v0.4.1
+	github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.2.5
 	github.com/stretchr/testify v1.11.1
 )
 
