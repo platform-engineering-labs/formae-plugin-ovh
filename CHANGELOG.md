@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Install with `sudo formae plugin install ovh` on the host that runs the
 formae agent.
 
+## [Unreleased]
+
+### Changed
+
+- The `oidcClientSecret` on `OVH::Registry::Oidc` is now typed `formae.SecretValue` so its value is hashed at rest end-to-end (previously stored in cleartext on the read/actual-state path). Requires a formae agent on the matching release; `minFormaeVersion` is bumped to 0.88.0.
+
 ## [0.1.4]
 
 ### Fixed
