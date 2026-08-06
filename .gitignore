@@ -41,3 +41,6 @@ CLAUDE.md
 
 # Worktrees
 .worktrees/
+
+# Root-level build output (never commit the plugin binary)
+/formae-plugin-ovh

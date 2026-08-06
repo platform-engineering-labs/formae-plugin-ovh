@@ -18,7 +18,7 @@ on:
           Formae version baked into the binary via VERSION (also propagated to
           plugins as FORMAE_VERSION; plugins use it to resolve their PKL formae
           schema dep against package://...formae@<version>). Defaults to the
-          canonical X.Y.Z derived from the latest tag on the formae branch —
+          canonical X.Y.Z derived from the latest tag on the formae branch -
           including dev tags, so a newly tagged 0.86.0-dev.N is picked up
           automatically. Set this explicitly to test an unreleased schema that
           has been pre-released via formae's schema-prerelease workflow but has
@@ -127,11 +127,11 @@ jobs:
           # their formae PKL dep against package://...formae@<version> on the
           # hub, so it must match a schema that has been published. The nightly
           # validates plugin main against formae main, so we pick the latest tag
-          # on the branch — including dev tags — since that is the most recent
+          # on the branch - including dev tags - since that is the most recent
           # published schema. The canonical X.Y.Z is stripped from any -dev.N
           # suffix to match how formae publishes schemas (a 0.86.0-dev.N release,
           # and the schema-prerelease workflow, both publish at formae@0.86.0).
-          # An explicit formae_version input overrides this — use it to test an
+          # An explicit formae_version input overrides this - use it to test an
           # unreleased, pre-released schema that has no matching tag yet.
           VERSION="${{ inputs.formae_version }}"
           if [ -z "$VERSION" ]; then
