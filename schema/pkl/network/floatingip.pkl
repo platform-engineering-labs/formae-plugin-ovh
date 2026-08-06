@@ -40,6 +40,7 @@ open class FloatingIP extends formae.Resource {
   @ovh.FieldHint {
     required = true
     createOnly = true
+    edgeKind = "attachesTo"
   }
   instance_id: String|formae.Resolvable
 
@@ -49,6 +50,7 @@ open class FloatingIP extends formae.Resource {
   @ovh.FieldHint {
     required = true
     createOnly = true
+    edgeKind = "attachesTo"
   }
   ip: String|formae.Resolvable
 
