@@ -128,7 +128,7 @@ open class Cluster extends formae.Resource {
   ///
   /// Accepts a bare String or a `formae.Value` so callers can use
   /// `new formae.Value { value = "1.33"; strategy = "SetOnce" }` when targeting
-  /// a minor version — OVH picks the current patch (e.g. returns "1.33.10-1")
+  /// a minor version - OVH picks the current patch (e.g. returns "1.33.10-1")
   /// and SetOnce tells the renderer not to re-compare the value on read.
   @ovh.FieldHint { hasProviderDefault = true }
   version: (String|formae.Value)?
@@ -169,7 +169,7 @@ open class Cluster extends formae.Resource {
 
   // === Computed/Output fields ===
   // All have hasProviderDefault = true so conformance Verify doesn't require
-  // them in testdata — they're populated by OVH and returned via Read.
+  // them in testdata - they're populated by OVH and returned via Read.
 
   /// Cluster ID
   @ovh.FieldHint { hasProviderDefault = true }

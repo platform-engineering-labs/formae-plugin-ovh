@@ -66,7 +66,7 @@ ovh_api() {
 }
 
 # ---- OVH API: Clean Kubernetes clusters ----
-# Managed Kubernetes clusters are not visible through OpenStack — they have
+# Managed Kubernetes clusters are not visible through OpenStack - they have
 # their own OVH-side endpoints. Delete them before private networks since a
 # cluster may attach to a private network.
 if [[ -n "${OVH_APPLICATION_KEY:-}" && -n "${OVH_CLOUD_PROJECT_ID:-}" ]]; then

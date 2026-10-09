@@ -200,7 +200,7 @@ func (p *ipRestrictionProvisioner) List(ctx context.Context, request *resource.L
 	for _, kubeID := range kubeIDs {
 		currentIPs, err := p.listIPRestrictions(ctx, project, kubeID)
 		if err != nil {
-			// Cluster gone or transient — skip rather than fail the whole listing.
+			// Cluster gone or transient - skip rather than fail the whole listing.
 			continue
 		}
 		for _, ip := range currentIPs {
@@ -211,7 +211,7 @@ func (p *ipRestrictionProvisioner) List(ctx context.Context, request *resource.L
 	return &resource.ListResult{NativeIDs: nativeIDs}, nil
 }
 
-// Status is unused — IP restrictions are synchronous, so Create/Delete return
+// Status is unused - IP restrictions are synchronous, so Create/Delete return
 // Success directly and the operation list below does not register OperationCheckStatus.
 // The method exists only to satisfy the prov.Provisioner interface.
 func (p *ipRestrictionProvisioner) Status(_ context.Context, request *resource.StatusRequest) (*resource.StatusResult, error) {
@@ -225,7 +225,7 @@ func (p *ipRestrictionProvisioner) Status(_ context.Context, request *resource.S
 	}, nil
 }
 
-// Update is unused — IP restrictions have no mutable fields. The method exists
+// Update is unused - IP restrictions have no mutable fields. The method exists
 // only to satisfy the prov.Provisioner interface; OperationUpdate is not
 // registered below, so this should never be invoked.
 func (p *ipRestrictionProvisioner) Update(_ context.Context, request *resource.UpdateRequest) (*resource.UpdateResult, error) {
