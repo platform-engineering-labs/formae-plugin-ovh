@@ -1,9 +1,35 @@
-# OVH Cloud Plugin for Formae
+# OVHcloud plugin for formae
 
 [![CI](https://github.com/platform-engineering-labs/formae-plugin-ovh/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/platform-engineering-labs/formae-plugin-ovh/actions/workflows/ci.yml)
-[![Nightly](https://github.com/platform-engineering-labs/formae-plugin-ovh/actions/workflows/nightly.yml/badge.svg?branch=main)](https://github.com/platform-engineering-labs/formae-plugin-ovh/actions/workflows/nightly.yml)
+[![Monthly](https://github.com/platform-engineering-labs/formae-plugin-ovh/actions/workflows/monthly.yml/badge.svg?branch=main)](https://github.com/platform-engineering-labs/formae-plugin-ovh/actions/workflows/monthly.yml)
 
-OVH Cloud resource plugin for [Formae](https://github.com/platform-engineering-labs/formae). This plugin enables Formae to manage OVH Public Cloud resources using the OpenStack APIs via [gophercloud](https://github.com/gophercloud/gophercloud).
+OVH Cloud resource plugin for [formae](https://github.com/platform-engineering-labs/formae). This plugin enables formae to manage OVH Public Cloud resources using the OpenStack APIs via [gophercloud](https://github.com/gophercloud/gophercloud).
+
+[formae](https://github.com/platform-engineering-labs/formae) · [Hub](https://hub.platform.engineering/platform.engineering/ovh)
+
+## Install
+
+Requires the formae CLI: see the [quick start](https://docs.formae.ai/documentation/get-started/quickstart).
+
+```bash
+formae plugin install ovh
+```
+
+Restart the formae agent afterwards so it loads the plugin.
+
+**New project:** with the agent running, `formae project init --include ovh my-project` creates `my-project` with a `PklProject` that declares the formae and ovh schema packages, so `import "@ovh/..."` resolves, and a starter `main.pkl`. Don't run it in an existing project: it overwrites both files.
+
+**Existing project:** add the plugin to `dependencies` in your `PklProject`, with the current version from the [hub page](https://hub.platform.engineering/platform.engineering/ovh), then run `pkl project resolve`:
+
+```pkl
+["ovh"] {
+  uri = "package://hub.platform.engineering/plugins/ovh/schema/pkl/ovh/ovh@<version>"
+}
+```
+
+Next: [write your first forma](https://docs.formae.ai/documentation/get-started/write-your-first-forma), then [`formae apply`](https://docs.formae.ai/documentation/reference/cli/apply) (see [apply modes](https://docs.formae.ai/documentation/concepts/apply-modes)).
+
+With an AI coding assistant, use the [formae plugin](https://docs.formae.ai/documentation/guides/ai-coding-assistants) (formerly `formae-mcp`), which can search the hub and fetch plugin examples. The formae documentation is also available as [llms.txt](https://docs.formae.ai/llms.txt).
 
 ## Supported Resources
 

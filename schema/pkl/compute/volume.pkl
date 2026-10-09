@@ -49,6 +49,7 @@ open class Volume extends formae.Resource {
   }
   volumeType: String?
 
+  @ovh.FieldHint
   description: String?
 
   @ovh.FieldHint {
