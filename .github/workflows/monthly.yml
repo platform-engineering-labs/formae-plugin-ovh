@@ -234,6 +234,9 @@ jobs:
       - name: Install plugin
         run: make install
 
+      - name: Resolve region-specific OVH defaults
+        run: ./scripts/ci/resolve-region-defaults.sh
+
       - name: Run conformance test (${{ matrix.test-case }})
         env:
           FORMAE_TEST_RUN_ID: nightly-main-${{ github.run_id }}
