@@ -278,7 +278,7 @@ func (p *clusterProvisioner) Status(ctx context.Context, request *resource.Statu
 		}, nil
 	}
 
-	// Inject serviceName so it's present in ResourceProperties — required field
+	// Inject serviceName so it's present in ResourceProperties - required field
 	// in the schema, not returned by the OVH API body.
 	if response.Body != nil {
 		response.Body["serviceName"] = project

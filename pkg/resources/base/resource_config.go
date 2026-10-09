@@ -67,7 +67,7 @@ type ResourceConfig struct {
 	// Success once the provider has accepted the DELETE call. Formae then
 	// polls Status() until the resource returns 404 (deletion complete).
 	// Use this when downstream resources share state with the deleted
-	// resource — e.g. an OVH instance keeps a port allocated on its subnet
+	// resource - e.g. an OVH instance keeps a port allocated on its subnet
 	// for several seconds after DELETE returns 200; without async-delete,
 	// formae fires sibling Deletes (subnet, network) too soon and the
 	// provider rejects them with "ports have an IP allocation from this

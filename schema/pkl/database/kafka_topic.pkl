@@ -42,20 +42,23 @@ open class KafkaTopic extends formae.Resource {
   name: String
 
   /// Number of partitions
-  @ovh.FieldHint { required = true }
+  @ovh.FieldHint { required = true; createOnly = true }
   partitions: Int
 
   /// Replication factor
-  @ovh.FieldHint { required = true }
+  @ovh.FieldHint { required = true; createOnly = true }
   replication: Int
 
   /// Minimum in-sync replicas required for writes
+  @ovh.FieldHint { createOnly = true }
   minInsyncReplicas: Int?
 
   /// Retention period in hours (-1 for unlimited)
+  @ovh.FieldHint { createOnly = true }
   retentionHours: Int?
 
   /// Retention size in bytes (-1 for unlimited)
+  @ovh.FieldHint { createOnly = true }
   retentionBytes: Int?
 
   // === Computed/Output fields ===

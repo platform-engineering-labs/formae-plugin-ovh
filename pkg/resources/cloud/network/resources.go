@@ -22,7 +22,7 @@ const (
 	PrivateSubnetResourceType = "OVH::Network::PrivateSubnet"
 	FloatingIPResourceType = "OVH::Network::FloatingIP"
 	// SecurityGroup ("OVH::Network::SecurityGroup") is registered via the
-	// OpenStack transport — see pkg/resources/openstack/resources/network/securitygroup.go.
+	// OpenStack transport - see pkg/resources/openstack/resources/network/securitygroup.go.
 	GatewayResourceType = "OVH::Network::Gateway"
 )
 
@@ -67,7 +67,7 @@ func privateNetworkStatusChecker(resourceData map[string]interface{}) (bool, err
 
 // privateNetworkReadinessProbe verifies the network is visible on the subnet
 // API endpoint. OVH has eventual consistency between the network and subnet
-// endpoints — a network can be ACTIVE on its own endpoint but not yet visible
+// endpoints - a network can be ACTIVE on its own endpoint but not yet visible
 // when creating subnets. This probe hits the subnet list endpoint to confirm.
 func privateNetworkReadinessProbe(ctx context.Context, client base.TransportClient, pathCtx base.PathContext) (bool, error) {
 	url := fmt.Sprintf("/cloud/project/%s/network/private/%s/subnet", pathCtx.Project, pathCtx.ResourceName)

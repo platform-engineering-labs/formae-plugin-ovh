@@ -34,6 +34,7 @@ open class SSHKeyResolvable extends formae.Resolvable {
 open class SSHKey extends formae.Resource {
   @ovh.FieldHint {
     required = true
+    createOnly = true
   }
   name: String
 

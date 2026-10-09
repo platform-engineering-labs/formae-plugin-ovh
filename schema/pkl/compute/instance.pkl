@@ -160,7 +160,7 @@ open class NetworkParams extends formae.SubResource {
 
   /// Static IP address (can only be defined for private networks).
   /// OVH allocates one via DHCP if unspecified, so the response always
-  /// carries an IP — mark it as provider-defaulted to avoid spurious
+  /// carries an IP - mark it as provider-defaulted to avoid spurious
   /// conformance "unexpected property" errors.
   @ovh.FieldHint {
     hasProviderDefault = true

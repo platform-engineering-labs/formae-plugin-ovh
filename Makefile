@@ -30,14 +30,18 @@ all: build
 build:
 	@mkdir -p schema/pkl && echo "$(PLUGIN_VERSION)" > schema/pkl/VERSION
 	$(GO) build $(GOFLAGS) -o bin/$(BINARY) .
-	@MIN_VERSION=$$($(GO) list -m -f '{{.Dir}}' github.com/platform-engineering-labs/formae/pkg/plugin 2>/dev/null | xargs -I{} grep 'MinFormaeVersion' {}/version.go 2>/dev/null | grep -oE '"[0-9]+\.[0-9]+\.[0-9]+"' | tr -d '"'); \
-	if [ -n "$$MIN_VERSION" ]; then \
-		echo "Updating minFormaeVersion to $$MIN_VERSION"; \
+	@SDK_MIN=$$($(GO) list -m -f '{{.Dir}}' github.com/platform-engineering-labs/formae/pkg/plugin 2>/dev/null | xargs -I{} grep 'MinFormaeVersion' {}/version.go 2>/dev/null | grep -oE '"[0-9]+\.[0-9]+\.[0-9]+"' | tr -d '"'); \
+	DECLARED=$$(pkl eval -x minFormaeVersion formae-plugin.pkl 2>/dev/null); \
+	EFFECTIVE=$$(printf '%s\n%s\n' "$$SDK_MIN" "$$DECLARED" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$$' | sort -t. -k1,1n -k2,2n -k3,3n | tail -1); \
+	if [ -n "$$EFFECTIVE" ] && [ "$$EFFECTIVE" != "$$DECLARED" ]; then \
+		echo "Raising minFormaeVersion to $$EFFECTIVE (sdk=$$SDK_MIN, declared=$$DECLARED)"; \
 		if [ "$$(uname)" = "Darwin" ]; then \
-			sed -i '' 's/^minFormaeVersion = .*/minFormaeVersion = "'"$$MIN_VERSION"'"/' formae-plugin.pkl; \
+			sed -i '' 's/^minFormaeVersion = .*/minFormaeVersion = "'"$$EFFECTIVE"'"/' formae-plugin.pkl; \
 		else \
-			sed -i 's/^minFormaeVersion = .*/minFormaeVersion = "'"$$MIN_VERSION"'"/' formae-plugin.pkl; \
+			sed -i 's/^minFormaeVersion = .*/minFormaeVersion = "'"$$EFFECTIVE"'"/' formae-plugin.pkl; \
 		fi; \
+	else \
+		echo "Keeping declared minFormaeVersion=$$DECLARED (sdk=$$SDK_MIN, never downgrade below declared)"; \
 	fi
 
 ## test: Run all tests
@@ -114,13 +118,13 @@ TEST_TIMEOUT := $(if $(TIMEOUT),$(if $(shell echo $(TIMEOUT) | grep -E '^[0-9]+$
 #     two of those windows back-to-back fit inside one OOB plugin RPC
 #
 # FORMAE_TIMEOUT: bounds the framework's per-operation wait
-# (PollStatus / WaitForResourceCompletion). Default 15 min — kube cluster
+# (PollStatus / WaitForResourceCompletion). Default 15 min - kube cluster
 # create+nodepool-installing has been observed at 10-12 min on US-EAST-VA-1.
 # OOB_TIMEOUT: bounds a single OOB Create/Delete plugin RPC. 15 min is enough
 # headroom for a slow OVH region without hiding genuine plugin hangs.
 # OOB_DELETE_TIMEOUT: bounds the post-sync inventory tombstone wait. The plugin
 # Delete has already returned by this point; what we wait for here is OVH's GET
-# eventually reflecting the deletion — for kube clusters that is 5-10 min.
+# eventually reflecting the deletion - for kube clusters that is 5-10 min.
 FORMAE_TIMEOUT ?= 50
 OOB_TIMEOUT ?= 15
 OOB_DELETE_TIMEOUT ?= 30

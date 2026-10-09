@@ -1,0 +1,371 @@
+name: Monthly
+
+# Tests plugin against formae main branch to catch SDK regressions before release.
+# PEL-maintained plugins only.
+
+on:
+  schedule:
+    - cron: '0 3 1 * *'  # 3 AM UTC
+  workflow_dispatch:
+    inputs:
+      formae_branch:
+        description: "Formae branch to build from (default: main)"
+        required: false
+        default: "main"
+        type: string
+      formae_version:
+        description: |
+          Formae version baked into the binary via VERSION (also propagated to
+          plugins as FORMAE_VERSION; plugins use it to resolve their PKL formae
+          schema dep against package://...formae@<version>). Defaults to the
+          canonical X.Y.Z derived from the latest tag on the formae branch -
+          including dev tags, so a newly tagged 0.86.0-dev.N is picked up
+          automatically. Set this explicitly to test an unreleased schema that
+          has been pre-released via formae's schema-prerelease workflow but has
+          no matching tag yet (e.g. formae_version=0.86.0 while 0.85.2 is the
+          latest tag).
+        required: false
+        default: ""
+        type: string
+
+# Prevent concurrent conformance tests (CI and nightly share test resources)
+concurrency:
+  group: ovh-conformance-tests
+  cancel-in-progress: false
+
+jobs:
+  # Discover test cases from testdata/ directory for matrix strategy
+  discover-tests:
+    runs-on: ubuntu-latest
+    outputs:
+      test-cases: ${{ steps.discover.outputs.test-cases }}
+    steps:
+      - name: Checkout plugin
+        uses: actions/checkout@v7
+
+      - name: Discover test cases
+        id: discover
+        run: |
+          # Find all *.pkl files in testdata/, exclude -update.pkl and -replace.pkl variants,
+          # and extract the base test case name
+          TEST_CASES=$(ls testdata/*.pkl 2>/dev/null \
+            | xargs -n1 basename \
+            | grep -v '\-update\.pkl$' \
+            | grep -v '\-replace\.pkl$' \
+            | sed 's/\.pkl$//' \
+            | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "Discovered test cases: ${TEST_CASES}"
+          echo "test-cases=${TEST_CASES}" >> "$GITHUB_OUTPUT"
+
+  # Clean up test resources before running any conformance tests
+  pre-cleanup:
+    needs: [discover-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout plugin
+        uses: actions/checkout@v7
+
+      - name: Configure credentials
+        run: |
+          echo "OVH_ENDPOINT=${{ secrets.OVH_ENDPOINT }}" >> $GITHUB_ENV
+          echo "OVH_APPLICATION_KEY=${{ secrets.OVH_APPLICATION_KEY }}" >> $GITHUB_ENV
+          echo "OVH_APPLICATION_SECRET=${{ secrets.OVH_APPLICATION_SECRET }}" >> $GITHUB_ENV
+          echo "OVH_CONSUMER_KEY=${{ secrets.OVH_CONSUMER_KEY }}" >> $GITHUB_ENV
+          echo "OVH_CLOUD_PROJECT_ID=${{ secrets.OVH_CLOUD_PROJECT_ID }}" >> $GITHUB_ENV
+          echo "OS_AUTH_URL=${{ secrets.OS_AUTH_URL }}" >> $GITHUB_ENV
+          echo "OS_USERNAME=${{ secrets.OS_USERNAME }}" >> $GITHUB_ENV
+          echo "OS_PASSWORD=${{ secrets.OS_PASSWORD }}" >> $GITHUB_ENV
+          echo "OS_PROJECT_ID=${{ secrets.OS_PROJECT_ID }}" >> $GITHUB_ENV
+          echo "OS_REGION_NAME=${{ secrets.OS_REGION_NAME }}" >> $GITHUB_ENV
+          echo "OS_USER_DOMAIN_NAME=${{ secrets.OS_USER_DOMAIN_NAME }}" >> $GITHUB_ENV
+          echo "OS_PROJECT_DOMAIN_NAME=${{ secrets.OS_PROJECT_DOMAIN_NAME }}" >> $GITHUB_ENV
+          echo "OS_IDENTITY_API_VERSION=3" >> $GITHUB_ENV
+
+      - name: Install OpenStack CLI
+        run: pip install python-openstackclient
+
+      - name: Clean test resources
+        run: ./scripts/ci/clean-environment.sh
+
+  # Conformance tests run the full CRUD lifecycle against real OVH resources.
+  # Each test case runs in its own isolated job via matrix strategy.
+  # Cleanup is handled by separate pre/post-cleanup jobs, NOT per test.
+  conformance-tests:
+    needs: [discover-tests, pre-cleanup]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        test-case: ${{ fromJson(needs.discover-tests.outputs.test-cases) }}
+      max-parallel: 10
+      fail-fast: false
+
+    steps:
+      - name: Checkout plugin
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: "1.25"
+
+      - name: Set up Pkl
+        uses: pkl-community/setup-pkl@v0
+        with:
+          pkl-version: 0.30.0
+
+      - name: Build formae
+        run: |
+          BRANCH="${{ inputs.formae_branch || 'main' }}"
+          echo "Building formae from branch: ${BRANCH}"
+          git clone --branch "${BRANCH}" --depth 1 https://github.com/platform-engineering-labs/formae.git /tmp/formae
+          cd /tmp/formae
+          git fetch --tags
+          # Get latest release tag (sorted by semver) and pass to make
+          # The version baked via VERSION becomes formae.Version at runtime and
+          # is propagated to plugins as FORMAE_VERSION. Plugins use it to resolve
+          # their formae PKL dep against package://...formae@<version> on the
+          # hub, so it must match a schema that has been published. The nightly
+          # validates plugin main against formae main, so we pick the latest tag
+          # on the branch - including dev tags - since that is the most recent
+          # published schema. The canonical X.Y.Z is stripped from any -dev.N
+          # suffix to match how formae publishes schemas (a 0.86.0-dev.N release,
+          # and the schema-prerelease workflow, both publish at formae@0.86.0).
+          # An explicit formae_version input overrides this - use it to test an
+          # unreleased, pre-released schema that has no matching tag yet.
+          VERSION="${{ inputs.formae_version }}"
+          if [ -z "$VERSION" ]; then
+            LATEST_TAG=$(git tag -l "[0-9]*" --sort=-version:refname | head -1)
+            VERSION=$(echo "$LATEST_TAG" | cut -d'-' -f1)
+            echo "No formae_version input; latest tag=${LATEST_TAG}, using canonical VERSION=${VERSION}"
+          else
+            echo "Using formae_version input: ${VERSION}"
+          fi
+          echo "Building formae with VERSION=${VERSION}"
+          make build VERSION="${VERSION}"
+          echo "FORMAE_BINARY=/tmp/formae/formae" >> $GITHUB_ENV
+
+      # Temporary: until Orbital package manager handles plugin version
+      # coordination, the formae Makefile is the source of truth for which
+      # plugin branch to build against. Parse the @ref suffix and check
+      # out that ref so the plugin is compatible with the formae binary.
+      - name: Align plugin branch with formae Makefile
+        run: |
+          PLUGIN_NAME=$(basename "${{ github.repository }}")
+          REF=$(grep "${PLUGIN_NAME}" /tmp/formae/Makefile \
+            | grep -o '@[^[:space:]\\]*' \
+            | head -1 \
+            | sed 's/^@//')
+          if [ -n "$REF" ]; then
+            echo "Formae Makefile pins ${PLUGIN_NAME} to ref: ${REF}"
+            git fetch origin "${REF}"
+            git checkout "${REF}"
+          else
+            echo "No ref override for ${PLUGIN_NAME}, staying on default branch"
+          fi
+
+      - name: Track formae clone
+        if: env.POSTHOG_API_KEY != ''
+        env:
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+        run: |
+          REPO=$(basename "$(git remote get-url origin)" .git 2>/dev/null || echo "unknown")
+          curl -sf -o /dev/null https://k.platform.engineering/capture/ \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg api_key "$POSTHOG_API_KEY" \
+              --arg repo "$REPO" \
+              --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+              --arg run_id "${GITHUB_RUN_ID:-}" \
+              '{
+                api_key: $api_key,
+                distinct_id: "formae-ci",
+                event: "ci_repo_clone",
+                timestamp: $ts,
+                properties: {
+                  "$process_person_profile": false,
+                  repo: $repo,
+                  cloned_repo: "formae",
+                  ci_run_id: $run_id
+                }
+              }')" || echo "[telemetry] event send failed (non-critical)" >&2
+
+      - name: Inject formae replace directives
+        run: |
+          FORMAE_SRC=/tmp/formae
+          for pkg in pkg/auth pkg/model pkg/plugin pkg/plugin-conformance-tests; do
+            if grep -q "formae/$pkg" go.mod 2>/dev/null; then
+              echo "Injecting replace for $pkg -> $FORMAE_SRC/$pkg"
+              go mod edit -replace "github.com/platform-engineering-labs/formae/$pkg=$FORMAE_SRC/$pkg"
+            fi
+          done
+          go mod tidy
+
+      - name: Configure credentials
+        run: |
+          echo "OVH_ENDPOINT=${{ secrets.OVH_ENDPOINT }}" >> $GITHUB_ENV
+          echo "OVH_APPLICATION_KEY=${{ secrets.OVH_APPLICATION_KEY }}" >> $GITHUB_ENV
+          echo "OVH_APPLICATION_SECRET=${{ secrets.OVH_APPLICATION_SECRET }}" >> $GITHUB_ENV
+          echo "OVH_CONSUMER_KEY=${{ secrets.OVH_CONSUMER_KEY }}" >> $GITHUB_ENV
+          echo "OVH_CLOUD_PROJECT_ID=${{ secrets.OVH_CLOUD_PROJECT_ID }}" >> $GITHUB_ENV
+          echo "OS_AUTH_URL=${{ secrets.OS_AUTH_URL }}" >> $GITHUB_ENV
+          echo "OS_USERNAME=${{ secrets.OS_USERNAME }}" >> $GITHUB_ENV
+          echo "OS_PASSWORD=${{ secrets.OS_PASSWORD }}" >> $GITHUB_ENV
+          echo "OS_PROJECT_ID=${{ secrets.OS_PROJECT_ID }}" >> $GITHUB_ENV
+          echo "OS_REGION_NAME=${{ secrets.OS_REGION_NAME }}" >> $GITHUB_ENV
+          echo "OS_USER_DOMAIN_NAME=${{ secrets.OS_USER_DOMAIN_NAME }}" >> $GITHUB_ENV
+          echo "OS_PROJECT_DOMAIN_NAME=${{ secrets.OS_PROJECT_DOMAIN_NAME }}" >> $GITHUB_ENV
+          echo "OS_IDENTITY_API_VERSION=3" >> $GITHUB_ENV
+
+      - name: Install OpenStack CLI
+        run: pip install python-openstackclient
+
+      - name: Inject formae replace directives
+        run: |
+          FORMAE_SRC=/tmp/formae
+          for pkg in pkg/auth pkg/model pkg/plugin pkg/plugin-conformance-tests; do
+            if grep -q "formae/$pkg" go.mod 2>/dev/null; then
+              echo "Injecting replace for $pkg -> $FORMAE_SRC/$pkg"
+              go mod edit -replace "github.com/platform-engineering-labs/formae/$pkg=$FORMAE_SRC/$pkg"
+            fi
+          done
+          go mod tidy
+
+      - name: Install plugin
+        run: make install
+
+      - name: Run conformance test (${{ matrix.test-case }})
+        env:
+          FORMAE_TEST_RUN_ID: nightly-main-${{ github.run_id }}
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+        run: make conformance-test-crud-run TEST=${{ matrix.test-case }}
+
+  # Clean up test resources after all conformance tests (always runs)
+  post-cleanup:
+    needs: [conformance-tests]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout plugin
+        uses: actions/checkout@v7
+
+      - name: Configure credentials
+        run: |
+          echo "OVH_ENDPOINT=${{ secrets.OVH_ENDPOINT }}" >> $GITHUB_ENV
+          echo "OVH_APPLICATION_KEY=${{ secrets.OVH_APPLICATION_KEY }}" >> $GITHUB_ENV
+          echo "OVH_APPLICATION_SECRET=${{ secrets.OVH_APPLICATION_SECRET }}" >> $GITHUB_ENV
+          echo "OVH_CONSUMER_KEY=${{ secrets.OVH_CONSUMER_KEY }}" >> $GITHUB_ENV
+          echo "OVH_CLOUD_PROJECT_ID=${{ secrets.OVH_CLOUD_PROJECT_ID }}" >> $GITHUB_ENV
+          echo "OS_AUTH_URL=${{ secrets.OS_AUTH_URL }}" >> $GITHUB_ENV
+          echo "OS_USERNAME=${{ secrets.OS_USERNAME }}" >> $GITHUB_ENV
+          echo "OS_PASSWORD=${{ secrets.OS_PASSWORD }}" >> $GITHUB_ENV
+          echo "OS_PROJECT_ID=${{ secrets.OS_PROJECT_ID }}" >> $GITHUB_ENV
+          echo "OS_REGION_NAME=${{ secrets.OS_REGION_NAME }}" >> $GITHUB_ENV
+          echo "OS_USER_DOMAIN_NAME=${{ secrets.OS_USER_DOMAIN_NAME }}" >> $GITHUB_ENV
+          echo "OS_PROJECT_DOMAIN_NAME=${{ secrets.OS_PROJECT_DOMAIN_NAME }}" >> $GITHUB_ENV
+          echo "OS_IDENTITY_API_VERSION=3" >> $GITHUB_ENV
+
+      - name: Install OpenStack CLI
+        run: pip install python-openstackclient
+
+      - name: Clean test resources
+        run: ./scripts/ci/clean-environment.sh
+
+  # Notify when nightly is fixed (was red, now green)
+  notify-fixed:
+    needs: [conformance-tests, post-cleanup]
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - name: Check if previous run failed
+        id: check_previous
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const runs = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'nightly.yml',
+              per_page: 2,
+              status: 'completed'
+            });
+
+            // Get previous run (skip current which isn't completed yet)
+            const previousRun = runs.data.workflow_runs.find(run => run.id !== context.runId);
+
+            if (previousRun && previousRun.conclusion === 'failure') {
+              return 'true';
+            }
+            return 'false';
+          result-encoding: string
+
+      - name: Notify Slack (Fixed)
+        if: steps.check_previous.outputs.result == 'true'
+        uses: slackapi/slack-github-action@v4.0.0
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": ":white_check_mark: Nightly fixed on ${{ github.repository }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": ":white_check_mark: *Nightly fixed* on `${{ github.repository }}`\n\nPlugin conformance tests now passing against formae main branch."
+                  }
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Run"
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }
+
+  # Notify on failure
+  notify-failure:
+    needs: [conformance-tests, post-cleanup]
+    runs-on: ubuntu-latest
+    if: failure()
+    steps:
+      - name: Notify Slack
+        uses: slackapi/slack-github-action@v4.0.0
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": ":warning: Nightly build failed on ${{ github.repository }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": ":warning: *Nightly build failed* on `${{ github.repository }}`\n\nPlugin conformance tests failed against formae main branch. This may indicate an SDK regression."
+                  }
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Run"
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }

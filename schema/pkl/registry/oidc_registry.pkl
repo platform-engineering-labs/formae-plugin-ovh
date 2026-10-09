@@ -72,6 +72,7 @@ open class Oidc extends formae.Resource {
   oidcAutoOnboard: Boolean?
 
   /// Delete users when removing OIDC config
+  @ovh.FieldHint { createOnly = true }
   deleteUsers: Boolean?
 
   hidden res: OidcResolvable = new {
