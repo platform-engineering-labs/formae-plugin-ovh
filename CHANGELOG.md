@@ -19,6 +19,16 @@ formae agent.
 - `description` on `OVH::Compute::Volume` and `versioning` on
   `OVH::Storage::S3Bucket` were silently dropped before reaching the plugin
   because they had no `@FieldHint`. Both are now applied.
+- Renaming an `OVH::Compute::Instance` now works: the update sends only the
+  instance name, which is all the OVH API accepts, and the result reflects
+  the renamed instance.
+- An `OVH::Compute::Instance` that enters `ERROR` fails right away with a
+  clear message instead of waiting for the operation to time out.
+- Instances created on a new `OVH::Network::PrivateNetwork` no longer fail
+  with "network not found": the network is reported ready only once OVH has
+  fully provisioned it in every region. A network in `ERROR` fails right away.
+- OVH API errors now include the resource type and HTTP status code, making
+  failed operations easier to diagnose.
 
 ## [0.1.4]
 

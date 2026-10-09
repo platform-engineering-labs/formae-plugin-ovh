@@ -5,6 +5,8 @@
 package compute
 
 import (
+	"fmt"
+
 	"github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/base"
 	"github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/cloud"
 	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
@@ -25,9 +27,16 @@ var cloudComputeRegistry *base.ResourceRegistry
 // derived `networks` field is empty. Waiting for ipAddresses to populate
 // ensures the persisted `networks` matches the spec at the verify step.
 //
-// OVH instances go through BUILD -> ACTIVE (or ERROR) states.
+// OVH instances go through BUILD -> ACTIVE (or ERROR) states. ERROR is
+// terminal, so it returns an error to stop polling with an actionable message
+// instead of looping until the framework times out.
 func instanceStatusChecker(resourceData map[string]interface{}) (bool, error) {
 	status, ok := resourceData["status"].(string)
+	if ok && status == "ERROR" {
+		name, _ := resourceData["name"].(string)
+		id, _ := resourceData["id"].(string)
+		return false, fmt.Errorf("instance %q (id=%s) entered ERROR state", name, id)
+	}
 	if !ok || status != "ACTIVE" {
 		return false, nil
 	}
@@ -74,6 +83,7 @@ func init() {
 					"region": "Region",
 				},
 			},
+			RequestTransformer:  instanceRequestTransformer,
 			ResponseTransformer: instanceTransformer,
 			StatusChecker:       instanceStatusChecker,
 			Operations: []resource.Operation{

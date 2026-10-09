@@ -6,6 +6,7 @@ package compute
 
 import (
 	"github.com/platform-engineering-labs/formae-plugin-ovh/pkg/resources/base"
+	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
 // instanceResponseTransformer maps the OVH instance response into the shape
@@ -72,3 +73,20 @@ func networksFromIPAddresses(raw interface{}) []map[string]interface{} {
 }
 
 var instanceTransformer base.ResponseTransformer = instanceResponseTransformer{}
+
+// instanceUpdateRequestTransformer passes Create bodies through unchanged and
+// reduces Update bodies to {instanceName}: PUT
+// /cloud/project/{serviceName}/instance/{instanceId} only accepts
+// cloud.ProjectInstanceUpdate (a single instanceName field) and rejects the
+// full schema body.
+type instanceUpdateRequestTransformer struct{}
+
+func (instanceUpdateRequestTransformer) Transform(props map[string]interface{}, ctx base.TransformContext) (map[string]interface{}, error) {
+	if ctx.Operation != resource.OperationUpdate {
+		return props, nil
+	}
+	name, _ := props["name"].(string)
+	return map[string]interface{}{"instanceName": name}, nil
+}
+
+var instanceRequestTransformer base.RequestTransformer = instanceUpdateRequestTransformer{}

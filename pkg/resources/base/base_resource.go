@@ -380,6 +380,16 @@ func (b *BaseResource) Update(ctx context.Context, request *resource.UpdateReque
 	}
 
 	responseProps := response.Body
+	// Some OVH endpoints (e.g. PUT instance) return an empty body. Re-read
+	// the resource so the caller sees its updated state.
+	if len(responseProps) == 0 {
+		if readResp, readErr := b.Client.Do(ctx, ovhtransport.RequestOptions{
+			Method: "GET",
+			Path:   url,
+		}); readErr == nil && readResp != nil {
+			responseProps = readResp.Body
+		}
+	}
 	if b.ResponseTransformer != nil {
 		transformCtx := b.buildTransformContext(ctx, pathCtx, resource.OperationUpdate)
 		responseProps = b.ResponseTransformer.Transform(responseProps, transformCtx)
@@ -1099,7 +1109,7 @@ func (b *BaseResource) handleTransportError(err error, operation resource.Operat
 				Operation:       operation,
 				OperationStatus: resource.OperationStatusFailure,
 				ErrorCode:       ovhtransport.ToResourceErrorCode(transportErr.Code),
-				StatusMessage:   transportErr.Message,
+				StatusMessage:   formatTransportError(b.ResourceConfig.ResourceType, transportErr),
 				NativeID:        nativeID,
 			},
 		}
@@ -1109,7 +1119,17 @@ func (b *BaseResource) handleTransportError(err error, operation resource.Operat
 
 func (b *BaseResource) handleTransportErrorUpdate(err error, nativeID string) *resource.UpdateResult {
 	if transportErr, ok := err.(*ovhtransport.Error); ok {
-		return b.updateFailureResult(nativeID, ovhtransport.ToResourceErrorCode(transportErr.Code), transportErr.Message)
+		return b.updateFailureResult(nativeID, ovhtransport.ToResourceErrorCode(transportErr.Code), formatTransportError(b.ResourceConfig.ResourceType, transportErr))
 	}
 	return b.updateFailureResult(nativeID, resource.OperationErrorCodeServiceInternalError, err.Error())
+}
+
+// formatTransportError builds a single-line message carrying the resource
+// type, HTTP code and OVH error so conformance and CI logs are diagnosable
+// without plugin debug output.
+func formatTransportError(resourceType string, err *ovhtransport.Error) string {
+	if err.HTTPCode > 0 {
+		return fmt.Sprintf("OVH %s: HTTP %d %s: %s", resourceType, err.HTTPCode, err.Code, err.Message)
+	}
+	return fmt.Sprintf("OVH %s: %s: %s", resourceType, err.Code, err.Message)
 }
