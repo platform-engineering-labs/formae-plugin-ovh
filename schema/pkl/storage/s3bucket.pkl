@@ -122,7 +122,8 @@ open class S3Bucket extends formae.Resource {
   @ovh.FieldHint { createOnly = true; hasProviderDefault = true }
   ownerId: Int?
 
-  /// Versioning configuration
+  /// Versioning configuration (Read reports "suspended" when unset)
+  @ovh.FieldHint { hasProviderDefault = true }
   versioning: Versioning?
 
   /// Server-side encryption configuration

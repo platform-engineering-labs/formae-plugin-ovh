@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Install with `sudo formae plugin install ovh` on the host that runs the
 formae agent.
 
+## [Unreleased]
+
+### Fixed
+
+- `description` on `OVH::Compute::Volume` and `versioning` on
+  `OVH::Storage::S3Bucket` were silently dropped before reaching the plugin
+  because they had no `@FieldHint`. Both are now applied.
+
 ## [0.1.4]
 
 ### Fixed
