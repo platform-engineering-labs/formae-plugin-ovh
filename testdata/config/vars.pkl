@@ -25,8 +25,10 @@ shortRegion = region.replaceFirst(Regex("-?\\d+$"), "")
 // Ext-Net is the public network provided by OVH for external connectivity
 extNetID = "b347ed75-8603-4ce0-a40c-c6c98a8820fc"
 
-// Ubuntu 24.04 image provided by OVH - region-specific IDs
-ubuntuImageID = read?("env:OVH_IMAGE_ID") ?? "03302136-e20b-446e-8b27-cf0aaf161810"
+// Ubuntu 24.04 image provided by OVH - region-specific IDs (default is US-EAST-VA-1).
+// OVH rotates these when it republishes the image; refresh via
+// GET /cloud/project/{id}/image?region=<region>&osType=linux or set OVH_IMAGE_ID.
+ubuntuImageID = read?("env:OVH_IMAGE_ID") ?? "40c82cd6-c9d0-466a-a1f8-21d0057a9afd"
 
 // s1-2 flavor (2GB RAM, 1 vCPU) - region-specific IDs
 flavorID = read?("env:OVH_FLAVOR_ID") ?? "a64381e7-c4e7-4b01-9fbe-da405c544d2e"

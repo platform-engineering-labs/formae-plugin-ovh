@@ -1,11 +1,11 @@
-name: Nightly
+name: Monthly
 
 # Tests plugin against formae main branch to catch SDK regressions before release.
 # PEL-maintained plugins only.
 
 on:
   schedule:
-    - cron: '0 3 * * *'  # 3 AM UTC
+    - cron: '0 3 1 * *'  # 3 AM UTC
   workflow_dispatch:
     inputs:
       formae_branch:
@@ -18,7 +18,7 @@ on:
           Formae version baked into the binary via VERSION (also propagated to
           plugins as FORMAE_VERSION; plugins use it to resolve their PKL formae
           schema dep against package://...formae@<version>). Defaults to the
-          canonical X.Y.Z derived from the latest tag on the formae branch —
+          canonical X.Y.Z derived from the latest tag on the formae branch -
           including dev tags, so a newly tagged 0.86.0-dev.N is picked up
           automatically. Set this explicitly to test an unreleased schema that
           has been pre-released via formae's schema-prerelease workflow but has
@@ -41,7 +41,7 @@ jobs:
       test-cases: ${{ steps.discover.outputs.test-cases }}
     steps:
       - name: Checkout plugin
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Discover test cases
         id: discover
@@ -63,7 +63,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout plugin
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Configure credentials
         run: |
@@ -102,10 +102,10 @@ jobs:
 
     steps:
       - name: Checkout plugin
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: "1.25"
 
@@ -127,11 +127,11 @@ jobs:
           # their formae PKL dep against package://...formae@<version> on the
           # hub, so it must match a schema that has been published. The nightly
           # validates plugin main against formae main, so we pick the latest tag
-          # on the branch — including dev tags — since that is the most recent
+          # on the branch - including dev tags - since that is the most recent
           # published schema. The canonical X.Y.Z is stripped from any -dev.N
           # suffix to match how formae publishes schemas (a 0.86.0-dev.N release,
           # and the schema-prerelease workflow, both publish at formae@0.86.0).
-          # An explicit formae_version input overrides this — use it to test an
+          # An explicit formae_version input overrides this - use it to test an
           # unreleased, pre-released schema that has no matching tag yet.
           VERSION="${{ inputs.formae_version }}"
           if [ -z "$VERSION" ]; then
@@ -247,7 +247,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout plugin
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Configure credentials
         run: |
@@ -301,7 +301,7 @@ jobs:
 
       - name: Notify Slack (Fixed)
         if: steps.check_previous.outputs.result == 'true'
-        uses: slackapi/slack-github-action@v3.0.1
+        uses: slackapi/slack-github-action@v4.0.0
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
           webhook-type: incoming-webhook
@@ -339,7 +339,7 @@ jobs:
     if: failure()
     steps:
       - name: Notify Slack
-        uses: slackapi/slack-github-action@v3.0.1
+        uses: slackapi/slack-github-action@v4.0.0
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
           webhook-type: incoming-webhook
