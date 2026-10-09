@@ -19,12 +19,14 @@ open class VolumeAttachment extends formae.Resource {
   @ovh.FieldHint {
     required = true
     createOnly = true
+    edgeKind = "attachesTo"
   }
   volume_id: String|formae.Resolvable
 
   @ovh.FieldHint {
     required = true
     createOnly = true
+    edgeKind = "attachesTo"
   }
   instance_id: String|formae.Resolvable
 

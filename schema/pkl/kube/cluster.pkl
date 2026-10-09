@@ -146,7 +146,7 @@ open class Cluster extends formae.Resource {
   kubeProxyMode: KubeProxyMode?
 
   /// Private network ID (OpenStack network UUID)
-  @ovh.FieldHint { createOnly = true; hasProviderDefault = true }
+  @ovh.FieldHint { createOnly = true; hasProviderDefault = true; edgeKind = "runtimeDependency" }
   privateNetworkId: (String|formae.Resolvable)?
 
   /// Private network configuration
@@ -154,11 +154,11 @@ open class Cluster extends formae.Resource {
   privateNetworkConfiguration: PrivateNetworkConfiguration?
 
   /// Subnet ID for load balancers
-  @ovh.FieldHint { createOnly = true; hasProviderDefault = true }
+  @ovh.FieldHint { createOnly = true; hasProviderDefault = true; edgeKind = "runtimeDependency" }
   loadBalancersSubnetId: (String|formae.Resolvable)?
 
   /// Subnet ID for nodes
-  @ovh.FieldHint { createOnly = true; hasProviderDefault = true }
+  @ovh.FieldHint { createOnly = true; hasProviderDefault = true; edgeKind = "runtimeDependency" }
   nodesSubnetId: (String|formae.Resolvable)?
 
   /// API server customization
