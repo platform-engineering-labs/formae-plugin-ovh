@@ -50,7 +50,7 @@ open class Oidc extends formae.Resource {
 
   /// OIDC client secret
   @ovh.FieldHint { required = true }
-  oidcClientSecret: String
+  oidcClientSecret: (String|formae.Resolvable|formae.Value|formae.SecretValue)
 
   /// OIDC scope (e.g., "openid,profile,email,offline_access")
   @ovh.FieldHint { required = true }

@@ -10,6 +10,10 @@ formae agent.
 
 ## [Unreleased]
 
+### Changed
+
+- The `oidcClientSecret` on `OVH::Registry::Oidc` is now typed `formae.SecretValue` so its value is hashed at rest end-to-end (previously stored in cleartext on the read/actual-state path). Requires a formae agent on the matching release; `minFormaeVersion` is bumped to 0.88.0.
+
 ### Fixed
 
 - `description` on `OVH::Compute::Volume` and `versioning` on
