@@ -28,10 +28,13 @@ on:
         default: ""
         type: string
 
-# Prevent concurrent conformance tests (CI and nightly share test resources)
+# Prevent concurrent conformance tests (CI and Monthly share test resources).
+# Same group as the conformance job in ci.yml; queue: max keeps waiting runs
+# queued instead of cancelling all but the newest pending one.
 concurrency:
   group: ovh-conformance-tests
   cancel-in-progress: false
+  queue: max
 
 jobs:
   # Discover test cases from testdata/ directory for matrix strategy
@@ -107,7 +110,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
-          go-version: "1.25"
+          go-version-file: go.mod
 
       - name: Set up Pkl
         uses: pkl-community/setup-pkl@v0
