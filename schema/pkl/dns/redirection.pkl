@@ -29,9 +29,10 @@ open class Redirection extends formae.Resource {
   /// Subdomain to redirect
   subDomain: String?
 
-  /// Target URL
+  /// Target URL (sent to OVH API as `target`; renamed here to avoid collision
+  /// with formae's reserved `target` property on Resource)
   @ovh.FieldHint { required = true }
-  target: String
+  redirectionTarget: String
 
   /// Redirection type
   @ovh.FieldHint { required = true }

@@ -33,9 +33,10 @@ open class Record extends formae.Resource {
   @ovh.FieldHint { required = true; createOnly = true }
   fieldType: RecordType
 
-  /// Target value
+  /// Target value (sent to OVH API as `target`; renamed here to avoid collision
+  /// with formae's reserved `target` property on Resource)
   @ovh.FieldHint { required = true }
-  target: String
+  recordTarget: String
 
   /// TTL in seconds
   ttl: Int?

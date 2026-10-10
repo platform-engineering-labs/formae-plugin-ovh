@@ -49,6 +49,8 @@ func init() {
 					"zone": "Zone",
 				},
 			},
+			RequestTransformer:  recordRequestTransformer,
+			ResponseTransformer: recordResponseTransformer,
 			Operations: []resource.Operation{
 				resource.OperationCreate,
 				resource.OperationRead,
@@ -70,6 +72,8 @@ func init() {
 					"zone": "Zone",
 				},
 			},
+			RequestTransformer:  redirectionRequestTransformer,
+			ResponseTransformer: redirectionResponseTransformer,
 			Operations: []resource.Operation{
 				resource.OperationCreate,
 				resource.OperationRead,
