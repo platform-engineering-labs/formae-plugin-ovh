@@ -5,8 +5,8 @@ go 1.26.0
 require (
 	github.com/gophercloud/gophercloud/v2 v2.15.0
 	github.com/ovh/go-ovh v1.9.0
-	github.com/platform-engineering-labs/formae/pkg/model v0.1.28
-	github.com/platform-engineering-labs/formae/pkg/plugin v0.4.2
+	github.com/platform-engineering-labs/formae/pkg/model v0.1.29
+	github.com/platform-engineering-labs/formae/pkg/plugin v0.4.4
 	github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.2.8
 	github.com/stretchr/testify v1.11.1
 )
@@ -55,7 +55,7 @@ require (
 	github.com/miekg/dns v1.1.72 // indirect
 	github.com/naegelejd/go-acl v0.0.0-20260323030528-42e4d61407df // indirect
 	github.com/platform-engineering-labs/formae/pkg/api/model v0.1.1 // indirect
-	github.com/platform-engineering-labs/formae/pkg/credential v0.1.0 // indirect
+	github.com/platform-engineering-labs/formae/pkg/credential v0.1.1-0.20260918154753-1ddaf2b87619 // indirect
 	github.com/platform-engineering-labs/orbital v0.1.36 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
